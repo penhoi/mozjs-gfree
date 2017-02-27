@@ -1,0 +1,11 @@
+--enable-optimize
+--enable-debug
+--enable-stdcxx-compat
+--disable-shared-js
+--enable-simulator=arm64
+
+16:42:35     INFO -  INFO - File gcc.tar.xz fetched from https://api.pub.build.mozilla.org/tooltool/ as /builds/slave/b2g_try_l64-b2g-haz_dep-000000/build/tmp5DUnxO
+16:47:21     INFO -  /builds/slave/b2g_try_l64-b2g-haz_dep-000000/build/gcc/bin/arm-linux-androideabi-gcc: No such file or directory
+
+/builds/slave/b2g_try_l64-b2g-haz_dep-000000/build/tmp5DUnxO
+/builds/slave/b2g_try_l64-b2g-haz_dep-000000/build/gcc/bin/arm-linux-androideabi-gcc: No such file or directory
