@@ -2216,6 +2216,7 @@ MacroAssembler::MacroAssembler(JSContext* cx, IonScript* ion,
 #ifdef DEBUG
     inCall_(false),
 #endif
+    scramble_retaddr_(false),
     emitProfilingInstrumentation_(false)
 {
     constructRoot(cx);

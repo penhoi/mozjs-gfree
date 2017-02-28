@@ -345,12 +345,39 @@ class MacroAssembler : public MacroAssemblerSpecific
     NonAssertingLabel asmOnConversionErrorLabel_;
     NonAssertingLabel asmOnOutOfBoundsLabel_;
 
+    void xor_retaddr(void)
+    {
+        const Operand retPtr = Operand(rsp, 0 + ShadowStackSpace);
+        MacroAssemblerSpecific::xorl(Imm32(retCookie_), retPtr);
+    }
   public:
-    MacroAssembler()
+    void enforce_scramble_retaddr(void)
+    {
+        scramble_retaddr_ = true;
+        retCookie_ = random();
+        xor_retaddr();
+    }
+
+    void ret(void)
+    {
+        if (scramble_retaddr_)
+            xor_retaddr();
+        MacroAssemblerSpecific::ret();
+    }
+    void retn(Imm32 n)
+    {
+        if (scramble_retaddr_)
+            xor_retaddr();
+        MacroAssemblerSpecific::retn(n);
+    }
+
+  public:
+    MacroAssembler(void)
       : framePushed_(0),
 #ifdef DEBUG
         inCall_(false),
 #endif
+        scramble_retaddr_(false),
         emitProfilingInstrumentation_(false)
     {
         JitContext* jcx = GetJitContext();
@@ -374,6 +401,7 @@ class MacroAssembler : public MacroAssemblerSpecific
 #endif
     }
 
+
     // This constructor should only be used when there is no JitContext active
     // (for example, Trampoline-$(ARCH).cpp and IonCaches.cpp).
     explicit MacroAssembler(JSContext* cx, IonScript* ion = nullptr,
@@ -386,6 +414,7 @@ class MacroAssembler : public MacroAssemblerSpecific
 #ifdef DEBUG
         inCall_(false),
 #endif
+        scramble_retaddr_(false),
         emitProfilingInstrumentation_(false)
     {
         if (alloc)
@@ -580,6 +609,8 @@ class MacroAssembler : public MacroAssemblerSpecific
     // Flag use to assert that we use ABI function in the right context.
     bool inCall_;
 #endif
+    bool scramble_retaddr_;
+    size_t retCookie_;
 
     // If set by setupUnalignedABICall then callWithABI will pop the stack
     // register which is on the stack.
