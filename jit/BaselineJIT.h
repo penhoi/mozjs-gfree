@@ -120,6 +120,8 @@ struct BaselineScript
   private:
     // Code pointer containing the actual method.
     RelocatablePtrJitCode method_;
+    bool hasRetCookie_;
+    size_t retCookie_;
 
     // For functions with a call object, template objects to use for the call
     // object and decl env object (linked via the call object's enclosing
@@ -343,9 +345,15 @@ struct BaselineScript
     JitCode* method() const {
         return method_;
     }
-    void setMethod(JitCode* code) {
+    void setMethod(JitCode* code, bool hasRetCookie = false, size_t cookie = 0) {
         MOZ_ASSERT(!method_);
         method_ = code;
+        hasRetCookie_ = hasRetCookie;
+        retCookie_ = cookie;
+    }
+    bool getRetCookie(size_t *cookie) {
+        *cookie = retCookie_;
+        return hasRetCookie_;
     }
 
     JSObject* templateScope() const {

@@ -896,6 +896,8 @@ JitCode::togglePreBarriers(bool enabled)
 
 IonScript::IonScript()
   : method_(nullptr),
+    hasRetCookie_(0),
+    retCookie_(0),
     deoptTable_(nullptr),
     osrPc_(nullptr),
     osrEntryOffset_(0),

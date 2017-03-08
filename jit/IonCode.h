@@ -178,6 +178,8 @@ struct IonScript
   private:
     // Code pointer containing the actual method.
     PreBarrieredJitCode method_;
+    size_t hasRetCookie_;
+    size_t retCookie_;
 
     // Deoptimization table used by this method.
     PreBarrieredJitCode deoptTable_;
@@ -364,10 +366,18 @@ struct IonScript
     JitCode* method() const {
         return method_;
     }
-    void setMethod(JitCode* code) {
+    void setMethod(JitCode* code, bool hasRetCookie = false, size_t cookie = 0) {
         MOZ_ASSERT(!invalidated());
         method_ = code;
+        hasRetCookie_ = hasRetCookie;
+        retCookie_ = cookie;
     }
+    bool getRetCookie(size_t *cookie)
+    {
+        *cookie = retCookie_;
+        return hasRetCookie_;
+    }
+
     void setDeoptTable(JitCode* code) {
         deoptTable_ = code;
     }

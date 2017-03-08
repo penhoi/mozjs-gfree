@@ -2216,7 +2216,8 @@ MacroAssembler::MacroAssembler(JSContext* cx, IonScript* ion,
 #ifdef DEBUG
     inCall_(false),
 #endif
-    scramble_retaddr_(false),
+    hasRetCookie_(false),
+    retCookie_(0),
     emitProfilingInstrumentation_(false)
 {
     constructRoot(cx);
@@ -2236,6 +2237,37 @@ MacroAssembler::MacroAssembler(JSContext* cx, IonScript* ion,
             enableProfilingInstrumentation();
     }
 }
+
+#ifdef JS_CODEGEN_ARM64
+void MacroAssembler::initScrambleRetaddr(size_t cookie)
+{   hasRetCookie_ = false;    }
+void MacroAssembler::xorSP(void) {}
+void MacroAssembler::xorBP(void) {}
+
+#else
+void MacroAssembler::initScrambleRetaddr(size_t cookie)
+{
+    hasRetCookie_ = true;
+    //retCookie_ = random();
+    retCookie_ = cookie;
+}
+
+void MacroAssembler::xorSP(void)
+{
+    if (hasRetCookie_ != 0) {
+    const Operand retPtr = Operand(StackPointer, 0);
+    MacroAssemblerSpecific::xorl(Imm32(retCookie_), retPtr);
+    }
+}
+
+void MacroAssembler::xorBP(void)
+{
+    if (hasRetCookie_ != 0) {
+    const Operand retPtr = Operand(FramePointer, sizeof(size_t));
+    MacroAssemblerSpecific::xorl(Imm32(retCookie_), retPtr);
+    }
+}
+#endif
 
 MacroAssembler::AfterICSaveLive
 MacroAssembler::icSaveLive(LiveRegisterSet& liveRegs)

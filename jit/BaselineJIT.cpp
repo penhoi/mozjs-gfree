@@ -48,6 +48,8 @@ BaselineScript::BaselineScript(uint32_t prologueOffset, uint32_t epilogueOffset,
                                uint32_t traceLoggerExitToggleOffset,
                                uint32_t postDebugPrologueOffset)
   : method_(nullptr),
+    hasRetCookie_(false),
+    retCookie_(0),
     templateScope_(nullptr),
     fallbackStubSpace_(),
     dependentAsmJSModules_(nullptr),

@@ -109,6 +109,7 @@ class JitFrameIterator
     uint8_t* current_;
     FrameType type_;
     uint8_t* returnAddressToFp_;
+    bool deXorSP_;
     size_t frameSize_;
 
   private:
@@ -211,6 +212,10 @@ class JitFrameIterator
     // return address that returns back to the current frame).
     uint8_t* returnAddressToFp() const {
         return returnAddressToFp_;
+    }
+    void setReturnAddressToFp(uint8_t* addr) {
+        if (!deXorSP_)
+           returnAddressToFp_ = addr;
     }
 
     // Previous frame information extracted from the current frame.

@@ -345,39 +345,14 @@ class MacroAssembler : public MacroAssemblerSpecific
     NonAssertingLabel asmOnConversionErrorLabel_;
     NonAssertingLabel asmOnOutOfBoundsLabel_;
 
-    void xor_retaddr(void)
-    {
-        const Operand retPtr = Operand(rsp, 0 + ShadowStackSpace);
-        MacroAssemblerSpecific::xorl(Imm32(retCookie_), retPtr);
-    }
-  public:
-    void enforce_scramble_retaddr(void)
-    {
-        scramble_retaddr_ = true;
-        retCookie_ = random();
-        xor_retaddr();
-    }
-
-    void ret(void)
-    {
-        if (scramble_retaddr_)
-            xor_retaddr();
-        MacroAssemblerSpecific::ret();
-    }
-    void retn(Imm32 n)
-    {
-        if (scramble_retaddr_)
-            xor_retaddr();
-        MacroAssemblerSpecific::retn(n);
-    }
-
   public:
     MacroAssembler(void)
       : framePushed_(0),
 #ifdef DEBUG
         inCall_(false),
 #endif
-        scramble_retaddr_(false),
+        hasRetCookie_(false),
+        retCookie_(0),
         emitProfilingInstrumentation_(false)
     {
         JitContext* jcx = GetJitContext();
@@ -414,7 +389,8 @@ class MacroAssembler : public MacroAssemblerSpecific
 #ifdef DEBUG
         inCall_(false),
 #endif
-        scramble_retaddr_(false),
+        hasRetCookie_(false),
+        retCookie_(0),
         emitProfilingInstrumentation_(false)
     {
         if (alloc)
@@ -609,7 +585,7 @@ class MacroAssembler : public MacroAssemblerSpecific
     // Flag use to assert that we use ABI function in the right context.
     bool inCall_;
 #endif
-    bool scramble_retaddr_;
+    bool hasRetCookie_;
     size_t retCookie_;
 
     // If set by setupUnalignedABICall then callWithABI will pop the stack
@@ -1325,7 +1301,32 @@ class MacroAssembler : public MacroAssemblerSpecific
     void branchStackPtrRhs(Condition cond, T lhs, Label* label) {
         branchPtr(cond, lhs, getStackPointer(), label);
     }
+
+    void ret(void)
+    {
+        if (hasRetCookie_)
+            xorSP();
+        MacroAssemblerSpecific::ret();
+    }
+    void retn(Imm32 n)
+    {
+        if (hasRetCookie_)
+            xorSP();
+        MacroAssemblerSpecific::retn(n);
+    }
 #endif // !JS_CODEGEN_ARM64
+
+    void initScrambleRetaddr(size_t cookie = 0x11223344);
+    void endScrambleRetaddr(void)
+    {   hasRetCookie_ = false;    }
+    bool getRetCookie(size_t *cookie)
+    {
+        *cookie = retCookie_;
+        return hasRetCookie_;
+    }
+    void xorSP(void);
+    void xorBP(void);
+
 
   public:
     void enableProfilingInstrumentation() {

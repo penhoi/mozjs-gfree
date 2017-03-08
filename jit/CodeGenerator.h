@@ -513,6 +513,8 @@ class CodeGenerator : public CodeGeneratorSpecific
     // Script counts created during code generation.
     IonScriptCounts* scriptCounts_;
 
+    size_t retCookie_;
+
 #if defined(JS_ION_PERF)
     PerfSpewer perfSpewer_;
 #endif
