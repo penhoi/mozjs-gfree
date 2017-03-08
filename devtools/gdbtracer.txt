@@ -1,0 +1,15 @@
+break project/protect-jit/exp/mozjs-45.0.2/js/src/jit/BaselineJIT.cpp:147
+#break project/protect-jit/exp/mozjs-45.0.2/js/src/jit/Ion.cpp:2710
+
+def dolog
+    set $i=0
+    while ($i<1000000)
+        si 8
+        set $i = $i + 1
+    end
+end
+
+run
+continue
+display/8i $pc
+dolog
