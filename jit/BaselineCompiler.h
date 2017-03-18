@@ -248,6 +248,7 @@ class BaselineCompiler : public BaselineCompilerSpecific
     Label* labelOf(jsbytecode* pc) {
         return &labels_[script->pcToOffset(pc)];
     }
+    Label *skipXorBP_;
 
     // If a script has more |nslots| than this, then emit code to do an
     // early stack check.

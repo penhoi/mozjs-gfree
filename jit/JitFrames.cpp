@@ -100,6 +100,7 @@ JitFrameIterator::JitFrameIterator()
   : current_(nullptr),
     type_(JitFrame_Exit),
     returnAddressToFp_(nullptr),
+    deXorSP_(false),
     frameSize_(0),
     cachedSafepointIndex_(nullptr),
     activation_(nullptr)
@@ -110,6 +111,7 @@ JitFrameIterator::JitFrameIterator(JSContext* cx)
   : current_(cx->runtime()->jitTop),
     type_(JitFrame_Exit),
     returnAddressToFp_(nullptr),
+    deXorSP_(false),
     frameSize_(0),
     cachedSafepointIndex_(nullptr),
     activation_(cx->runtime()->activation()->asJit())
@@ -128,6 +130,7 @@ JitFrameIterator::JitFrameIterator(const ActivationIterator& activations)
   : current_(activations.jitTop()),
     type_(JitFrame_Exit),
     returnAddressToFp_(nullptr),
+    deXorSP_(false),
     frameSize_(0),
     cachedSafepointIndex_(nullptr),
     activation_(activations->asJit())
@@ -161,10 +164,23 @@ JitFrameIterator::checkInvalidation(IonScript** ionScriptOut) const
     uint8_t* returnAddr = returnAddressToFp();
     // N.B. the current IonScript is not the same as the frame's
     // IonScript if the frame has since been invalidated.
-    bool invalidated = !script->hasIonScript() ||
-                       !script->ionScript()->containsReturnAddress(returnAddr);
-    if (!invalidated)
+    bool notInvalidated = script->hasIonScript() &&
+                       script->ionScript()->containsReturnAddress(returnAddr);
+    if (notInvalidated)
         return false;
+
+/*    size_t cookie;
+    uint8_t* addr;
+    if (script->hasIonScript() && script->ionScript()->getRetCookie(&cookie) ) {
+        addr = (uint8_t*)((size_t)returnAddr ^ cookie);
+        //Preceded by a call instruction
+        notInvalidated = script->ionScript()->containsReturnAddress(addr) &&
+            ((addr[-2] == 0xff && (addr[-1] & 0x38) == 0x10) || addr[-5] == 0xe8);
+        if (notInvalidated) {
+            (const_cast<JitFrameIterator*>(this))->setReturnAddressToFp(addr);
+            return false;
+        }
+    }*/
 
     int32_t invalidationDataOffset = ((int32_t*) returnAddr)[-1];
     uint8_t* ionScriptDataOffset = returnAddr + invalidationDataOffset;
@@ -244,6 +260,15 @@ JitFrameIterator::baselineScriptAndPc(JSScript** scriptRes, jsbytecode** pcRes) 
     ICEntry& icEntry = script->baselineScript()->icEntryFromReturnAddress(retAddr);
     *pcRes = icEntry.pc(script);
 }
+
+/*void
+JitFrameIterator::setReturnAddressToFp(uint8_t* addr)
+{
+    if (!deXorSP_) {
+       returnAddressToFp_ = addr;
+       deXorSP_ = true;
+    }
+}*/
 
 Value*
 JitFrameIterator::actualArgs() const
@@ -838,8 +863,11 @@ HandleException(ResumeFromException* rfe)
     // iterating, we need a variant here that is automatically updated should
     // on-stack recompilation occur.
     DebugModeOSRVolatileJitFrameIterator iter(cx);
+    bool hasCookie = false;
+    size_t cookie;
     while (!iter.isEntry()) {
         bool overrecursed = false;
+        hasCookie = false;
         if (iter.isIonJS()) {
             // Search each inlined frame for live iterator objects, and close
             // them.
@@ -848,6 +876,8 @@ HandleException(ResumeFromException* rfe)
             // Invalidation state will be the same for all inlined scripts in the frame.
             IonScript* ionScript = nullptr;
             bool invalidated = iter.checkInvalidation(&ionScript);
+            if (!invalidated && ionScript != nullptr)
+                hasCookie = ionScript->getRetCookie(&cookie);
 
             for (;;) {
                 HandleExceptionIon(cx, frames, rfe, &overrecursed);
@@ -866,7 +896,7 @@ HandleException(ResumeFromException* rfe)
 
                 JSScript* script = frames.script();
                 probes::ExitScript(cx, script, script->functionNonDelazifying(),
-                                   /* popSPSFrame = */ false);
+                        /* popSPSFrame = */ false);
                 if (!frames.more()) {
                     TraceLogStopEvent(logger, TraceLogger_IonMonkey);
                     TraceLogStopEvent(logger, TraceLogger_Scripts);
@@ -916,10 +946,28 @@ HandleException(ResumeFromException* rfe)
             // Unwind profiler pseudo-stack
             JSScript* script = iter.script();
             probes::ExitScript(cx, script, script->functionNonDelazifying(),
-                               /* popSPSFrame = */ false);
+                    /* popSPSFrame = */ false);
 
-            if (rfe->kind == ResumeFromException::RESUME_FORCED_RETURN)
+            if (rfe->kind == ResumeFromException::RESUME_FORCED_RETURN) {
+
+                /*if (script->hasBaselineScript() && 
+                 * script->baselineScript()->getRetCookie(&cookie)) {
+                  size_t addr = (size_t)iter.fp();
+                  addr = addr ^ cookie;
+                  iter.setReturnAddressToFp((uint8_t*)&addr);
+                  }*/
                 return;
+            }
+            hasCookie = (script != nullptr) && 
+                script->hasBaselineScript() &&
+                script->baselineScript()->getRetCookie(&cookie) &&
+                (JSOp(*pc) != JSOP_LOOPENTRY);
+            /*if (hasCookie && JSOp(*pc) != JSOP_LOOPENTRY) {
+                  size_t addr = (size_t)iter.fp();
+                  addr = addr ^ cookie;
+                  iter.setReturnAddressToFp((uint8_t*)&addr);
+            }*/
+
         }
 
         JitFrameLayout* current = iter.isScripted() ? iter.jsFrame() : nullptr;
@@ -927,6 +975,10 @@ HandleException(ResumeFromException* rfe)
         ++iter;
 
         if (current) {
+            //uint8_t *addr = current->returnAddress();
+            //*addr = (uint8_t)((size_t)addr ^ cookie);
+            //current->setReturnAddress(addr);
+
             // Unwind the frame by updating jitTop. This is necessary so that
             // (1) debugger exception unwind and leave frame hooks don't see this
             // frame when they use ScriptFrameIter, and (2) ScriptFrameIter does
@@ -943,6 +995,10 @@ HandleException(ResumeFromException* rfe)
     }
 
     rfe->stackPointer = iter.fp();
+    if (hasCookie)
+        *(size_t*)rfe->stackPointer = *(size_t*)rfe->stackPointer ^ cookie;
+    //    size_t *ptrStack = (size_t*)iter.fp();
+    //*ptrStack = *ptrStack ^ cookie;
 }
 
 void
@@ -2362,8 +2418,11 @@ const SafepointIndex*
 JitFrameIterator::safepoint() const
 {
     MOZ_ASSERT(isIonJS());
-    if (!cachedSafepointIndex_)
-        cachedSafepointIndex_ = ionScript()->getSafepointIndex(returnAddressToFp());
+    if (!cachedSafepointIndex_) {
+        //Please don't merge the following two sentences into a single one!
+        IonScript *is = ionScript();
+        cachedSafepointIndex_ =is->getSafepointIndex(returnAddressToFp());
+    }
     return cachedSafepointIndex_;
 }
 

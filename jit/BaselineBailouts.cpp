@@ -1412,6 +1412,7 @@ jit::BailoutIonToBaseline(JSContext* cx, JitActivation* activation, JitFrameIter
                           bool invalidate, BaselineBailoutInfo** bailoutInfo,
                           const ExceptionBailoutInfo* excInfo)
 {
+	printf("%s\n", __FUNCTION__);
     MOZ_ASSERT(bailoutInfo != nullptr);
     MOZ_ASSERT(*bailoutInfo == nullptr);
 
@@ -1467,6 +1468,16 @@ jit::BailoutIonToBaseline(JSContext* cx, JitActivation* activation, JitFrameIter
     JitSpew(JitSpew_BaselineBailouts, "Bailing to baseline %s:%u (IonScript=%p) (FrameType=%d)",
             iter.script()->filename(), iter.script()->lineno(), (void*) iter.ionScript(),
             (int) prevFrameType);
+
+    /*if (iter.script()->hasBaselineScript()) {
+      BaselineScript *bs = iter.script()->baselineScript();
+      size_t *ptrRet;
+      size_t cookie;
+      if (bs->getRetCookie(&cookie)) {
+      ptrRet = (size_t*)iter.fp();
+     *ptrRet = *ptrRet ^ cookie;
+     }
+    }*/
 
     bool catchingException;
     bool propagatingExceptionForDebugMode;
@@ -1748,6 +1759,7 @@ CopyFromRematerializedFrame(JSContext* cx, JitActivation* act, uint8_t* fp, size
 uint32_t
 jit::FinishBailoutToBaseline(BaselineBailoutInfo* bailoutInfo)
 {
+	printf("%s\n", __FUNCTION__);
     // The caller pushes R0 and R1 on the stack without rooting them.
     // Since GC here is very unlikely just suppress it.
     JSContext* cx = GetJSContextFromJitCode();
@@ -1765,6 +1777,7 @@ jit::FinishBailoutToBaseline(BaselineBailoutInfo* bailoutInfo)
     uint32_t numFrames = bailoutInfo->numFrames;
     MOZ_ASSERT(numFrames > 0);
     BailoutKind bailoutKind = bailoutInfo->bailoutKind;
+    jsbytecode* resumePC = bailoutInfo->resumePC;
 
     // Free the bailout buffer.
     js_free(bailoutInfo);
@@ -1828,9 +1841,24 @@ jit::FinishBailoutToBaseline(BaselineBailoutInfo* bailoutInfo)
                 outerFp = iter.fp();
             }
 
+
+
+            if (JSOp(*resumePC) != JSOP_LOOPENTRY) {
+              /*BaselineScript *bs = frame->script()->baselineScript();
+              size_t *ptrRet;
+              size_t cookie;
+              if (bs->getRetCookie(&cookie)) {
+              ptrRet = (size_t*)iter.fp();
+             *ptrRet = *ptrRet ^ cookie;
+
+             }*/
+
+
+            }
             frameno++;
         }
-
+        if ((JSOp(*resumePC) != JSOP_LOOPENTRY) and frameno != numFrames)
+        iter.current()->dexorReturnAddress();
         ++iter;
     }
 

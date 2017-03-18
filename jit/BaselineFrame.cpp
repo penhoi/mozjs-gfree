@@ -171,6 +171,7 @@ BaselineFrame::initForOsr(InterpreterFrame* fp, uint32_t numStackValues)
         *valueSlot(i) = fp->slots()[i];
 
     if (fp->isDebuggee()) {
+        printf("%s: isDebuggee\n", __FUNCTION__);
         JSContext* cx = GetJSContextFromJitCode();
 
         // For debuggee frames, update any Debugger.Frame objects for the

@@ -24,9 +24,32 @@ using namespace js::jit;
 
 using mozilla::IsInRange;
 
+void DexorReturnAddress(CommonFrameLayout *ptr, size_t retCookie, BailoutKind bailoutKind)
+{
+    bool bXor = true;
+
+    switch (bailoutKind) {
+        case Bailout_DuringVMCall:
+            bXor = false;
+            break;
+        default:
+            bXor = true;
+            break;
+    }
+
+    /*if (bXor) {
+        size_t *ptrRet = (size_t*)ptr->returnAddress();
+        size_t v = *ptrRet ^ retCookie;
+
+        printf("Dexoring: %lx to %lx", *ptrRet, v);
+        *ptrRet = v;
+    }*/
+}
+
 uint32_t
 jit::Bailout(BailoutStack* sp, BaselineBailoutInfo** bailoutInfo)
 {
+	printf("%s\n", __FUNCTION__);
     JSContext* cx = GetJSContextFromJitCode();
     MOZ_ASSERT(bailoutInfo);
 
@@ -63,6 +86,12 @@ jit::Bailout(BailoutStack* sp, BaselineBailoutInfo** bailoutInfo)
                            /* popSPSFrame = */ false);
 
         EnsureExitFrame(iter.jsFrame());
+    }
+    else if (iter.script()->hasBaselineScript()) {
+        BaselineScript *bs = iter.script()->baselineScript();
+        size_t cookie;
+        if (bs->getRetCookie(&cookie))
+            DexorReturnAddress(iter.current(), cookie, (*bailoutInfo)->bailoutKind);
     }
 
     // This condition was wrong when we entered this bailout function, but it
@@ -103,6 +132,7 @@ uint32_t
 jit::InvalidationBailout(InvalidationBailoutStack* sp, size_t* frameSizeOut,
                          BaselineBailoutInfo** bailoutInfo)
 {
+	printf("%s\n", __FUNCTION__);
     sp->checkInvariants();
 
     JSContext* cx = GetJSContextFromJitCode();
@@ -128,6 +158,15 @@ jit::InvalidationBailout(InvalidationBailoutStack* sp, size_t* frameSizeOut,
     *bailoutInfo = nullptr;
     uint32_t retval = BailoutIonToBaseline(cx, bailoutData.activation(), iter, true, bailoutInfo,
                                            /* excInfo = */ nullptr);
+    /*if (*bailoutInfo != nullptr && iter.script()->hasBaselineScript()) {
+        BaselineScript *bs = iter.script()->baselineScript();
+        size_t *ptrRet;
+        size_t cookie;
+        if (bs->getRetCookie(&cookie)) {
+            ptrRet = (size_t*)iter.fp();
+            *ptrRet = *ptrRet ^ cookie;
+        }
+    }*/
     MOZ_ASSERT(retval == BAILOUT_RETURN_OK ||
                retval == BAILOUT_RETURN_FATAL_ERROR ||
                retval == BAILOUT_RETURN_OVERRECURSED);
@@ -163,6 +202,12 @@ jit::InvalidationBailout(InvalidationBailoutStack* sp, size_t* frameSizeOut,
         JitSpew(JitSpew_IonInvalidate, "   new  frameSize %u", unsigned(frame->prevFrameLocalSize()));
         JitSpew(JitSpew_IonInvalidate, "   new  ra %p", (void*) frame->returnAddress());
     }
+    else if (iter.script()->hasBaselineScript()) {
+        BaselineScript *bs = iter.script()->baselineScript();
+        size_t cookie;
+        if (bs->getRetCookie(&cookie))
+            DexorReturnAddress(iter.current(), cookie, (*bailoutInfo)->bailoutKind);
+    }
 
     iter.ionScript()->decrementInvalidationCount(cx->runtime()->defaultFreeOp());
 
@@ -192,6 +237,7 @@ jit::ExceptionHandlerBailout(JSContext* cx, const InlineFrameIterator& frame,
                              const ExceptionBailoutInfo& excInfo,
                              bool* overrecursed)
 {
+	printf("%s\n", __FUNCTION__);
     // We can be propagating debug mode exceptions without there being an
     // actual exception pending. For instance, when we return false from an
     // operation callback like a timeout handler.
@@ -230,6 +276,15 @@ jit::ExceptionHandlerBailout(JSContext* cx, const InlineFrameIterator& frame,
         rfe->kind = ResumeFromException::RESUME_BAILOUT;
         rfe->target = cx->runtime()->jitRuntime()->getBailoutTail()->raw();
         rfe->bailoutInfo = bailoutInfo;
+
+        if (iter.script()->hasBaselineScript()) {
+            BaselineScript *bs = iter.script()->baselineScript();
+            size_t cookie;
+            if (bs->getRetCookie(&cookie))
+                DexorReturnAddress(iter.current(), cookie, bailoutInfo->bailoutKind);
+        }
+
+
     } else {
         // Bailout failed. If the overrecursion check failed, clear the
         // exception to turn this into an uncatchable error, continue popping

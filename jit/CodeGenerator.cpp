@@ -155,6 +155,7 @@ CodeGenerator::CodeGenerator(MIRGenerator* gen, LIRGraph* graph, MacroAssembler*
   : CodeGeneratorSpecific(gen, graph, masm)
   , ionScriptLabels_(gen->alloc())
   , scriptCounts_(nullptr)
+  , retCookie_(0)
   , simdRefreshTemplatesDuringLink_(0)
 {
 }
@@ -4180,6 +4181,7 @@ CodeGenerator::emitDebugResultChecks(LInstruction* ins)
 bool
 CodeGenerator::generateBody()
 {
+    JitSpew(JitSpew_Codegen, "%s", __FUNCTION__);
     IonScriptCounts* counts = maybeCreateScriptCounts();
 
 #if defined(JS_ION_PERF)
@@ -7959,6 +7961,13 @@ CodeGenerator::generate()
     if (!safepoints_.init(gen->alloc()))
         return false;
 
+    //Check if the native codes need to scramble return address.
+    jsbytecode *pc = gen->info().osrPc();
+    bool isLoopEntry = pc && (JSOp(*pc) == JSOP_LOOPENTRY);
+    //if (!isLoopEntry)
+    //    masm.initScrambleRetaddr();
+
+
     if (!generatePrologue())
         return false;
 
@@ -7986,6 +7995,12 @@ CodeGenerator::generate()
         return false;
 
     masm.bind(&skipPrologue);
+
+    /*if (isLoopEntry) {
+        size_t cookie;
+        if (gen->info().script()->baselineScript()->getRetCookie(&cookie))
+            masm.initScrambleRetaddr(cookie);
+    }*/
 
 #ifdef DEBUG
     // Assert that the argument types are correct.
@@ -8247,7 +8262,10 @@ CodeGenerator::link(JSContext* cx, CompilerConstraintList* constraints)
         code->setHasBytecodeMap();
     }
 
-    ionScript->setMethod(code);
+    bool hasCookie;
+    size_t cookie;
+    hasCookie = masm.getRetCookie(&cookie);
+    ionScript->setMethod(code, hasCookie, cookie);
     ionScript->setSkipArgCheckEntryOffset(getSkipArgCheckEntryOffset());
 
     // If SPS is enabled, mark IonScript as having been instrumented with SPS

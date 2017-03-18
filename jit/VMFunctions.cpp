@@ -1068,6 +1068,7 @@ bool
 InitBaselineFrameForOsr(BaselineFrame* frame, InterpreterFrame* interpFrame,
                         uint32_t numStackValues)
 {
+    printf("%s\n", __FUNCTION__);
     return frame->initForOsr(interpFrame, numStackValues);
 }
 

@@ -188,7 +188,11 @@ class OsiIndex
 // The descriptor is organized into three sections:
 // [ frame size | has cached saved frame bit | frame type ]
 // < highest - - - - - - - - - - - - - - lowest >
-static const uintptr_t FRAMESIZE_SHIFT = 5;
+static const uintptr_t FRAMESIZE_SHIFT = 16;
+static const uintptr_t XORCOOKIE_BITS = 10;
+static const uintptr_t XORCOOKIE_SHIFT = (FRAMESIZE_SHIFT - XORCOOKIE_BITS);
+static const uintptr_t XORCOOKIE_MASK = ((1 << FRAMESIZE_SHIFT) - 1) ^ ((1 << XORCOOKIE_SHIFT) - 1);
+static const uintptr_t HASXORCOOKIE_BIT = 1 << 5;
 static const uintptr_t HASCACHEDSAVEDFRAME_BIT = 1 << 4;
 static const uintptr_t FRAMETYPE_BITS = 4;
 
@@ -358,10 +362,23 @@ class CommonFrameLayout
         descriptor_ |= HASCACHEDSAVEDFRAME_BIT;
     }
     uint8_t* returnAddress() const {
-        return returnAddress_;
+        if (descriptor_ & HASXORCOOKIE_BIT) {
+            size_t cookie = (descriptor_ & XORCOOKIE_MASK) >> XORCOOKIE_SHIFT;
+            return (uint8_t*)((size_t)returnAddress_ ^ cookie);
+        }
+        else
+            return returnAddress_;
     }
     void setReturnAddress(uint8_t* addr) {
         returnAddress_ = addr;
+        descriptor_ ^= HASXORCOOKIE_BIT;	// set to no XORCOOKIE
+    }
+    void dexorReturnAddress() {
+        if (descriptor_ & HASXORCOOKIE_BIT) {
+            size_t cookie = (descriptor_ & XORCOOKIE_MASK) >> XORCOOKIE_SHIFT;
+            *(size_t*)returnAddress_ = (size_t)returnAddress_ ^ cookie;
+            descriptor_ ^= HASXORCOOKIE_BIT;
+        }
     }
 };
 
@@ -370,7 +387,7 @@ class JitFrameLayout : public CommonFrameLayout
     CalleeToken calleeToken_;
     uintptr_t numActualArgs_;
 
-  public:
+    public:
     CalleeToken calleeToken() const {
         return calleeToken_;
     }

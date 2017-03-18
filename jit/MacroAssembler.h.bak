@@ -346,13 +346,11 @@ class MacroAssembler : public MacroAssemblerSpecific
     NonAssertingLabel asmOnOutOfBoundsLabel_;
 
   public:
-    MacroAssembler(void)
+    MacroAssembler()
       : framePushed_(0),
 #ifdef DEBUG
         inCall_(false),
 #endif
-        hasRetCookie_(false),
-        retCookie_(0),
         emitProfilingInstrumentation_(false)
     {
         JitContext* jcx = GetJitContext();
@@ -376,7 +374,6 @@ class MacroAssembler : public MacroAssemblerSpecific
 #endif
     }
 
-
     // This constructor should only be used when there is no JitContext active
     // (for example, Trampoline-$(ARCH).cpp and IonCaches.cpp).
     explicit MacroAssembler(JSContext* cx, IonScript* ion = nullptr,
@@ -389,8 +386,6 @@ class MacroAssembler : public MacroAssemblerSpecific
 #ifdef DEBUG
         inCall_(false),
 #endif
-        hasRetCookie_(false),
-        retCookie_(0),
         emitProfilingInstrumentation_(false)
     {
         if (alloc)
@@ -585,8 +580,6 @@ class MacroAssembler : public MacroAssemblerSpecific
     // Flag use to assert that we use ABI function in the right context.
     bool inCall_;
 #endif
-    bool hasRetCookie_;
-    size_t retCookie_;
 
     // If set by setupUnalignedABICall then callWithABI will pop the stack
     // register which is on the stack.
@@ -1301,36 +1294,7 @@ class MacroAssembler : public MacroAssemblerSpecific
     void branchStackPtrRhs(Condition cond, T lhs, Label* label) {
         branchPtr(cond, lhs, getStackPointer(), label);
     }
-
-    void ret(void)
-    {
-        if (hasRetCookie_) {
-            const Operand retPtr = Operand(StackPointer, 0);
-            MacroAssemblerSpecific::xorl(Imm32(retCookie_), retPtr);
-        }
-        MacroAssemblerSpecific::ret();
-    }
-    void retn(Imm32 n)
-    {
-        if (hasRetCookie_) {
-            const Operand retPtr = Operand(StackPointer, 0);
-            MacroAssemblerSpecific::xorl(Imm32(retCookie_), retPtr);
-        }
-        MacroAssemblerSpecific::retn(n);
-    }
 #endif // !JS_CODEGEN_ARM64
-
-    void initScrambleRetaddr(size_t cookie = 0x11223344);
-    void endScrambleRetaddr(void)
-    {   hasRetCookie_ = false;    }
-
-    bool getRetCookie(size_t *cookie)
-    {
-        *cookie = retCookie_;
-        return hasRetCookie_;
-    }
-    void xorSP(void);
-    void xorSPviaBP(void);
 
   public:
     void enableProfilingInstrumentation() {

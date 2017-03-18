@@ -2211,13 +2211,12 @@ MacroAssembler::alignJitStackBasedOnNArgs(uint32_t nargs)
 // ===============================================================
 
 MacroAssembler::MacroAssembler(JSContext* cx, IonScript* ion,
-                               JSScript* script, jsbytecode* pc)
+                               JSScript* script, jsbytecode* pc,
+                               bool scramble_retaddr)
   : framePushed_(0),
 #ifdef DEBUG
     inCall_(false),
 #endif
-    hasRetCookie_(false),
-    retCookie_(0),
     emitProfilingInstrumentation_(false)
 {
     constructRoot(cx);
@@ -2236,46 +2235,14 @@ MacroAssembler::MacroAssembler(JSContext* cx, IonScript* ion,
         if (pc && cx->runtime()->spsProfiler.enabled())
             enableProfilingInstrumentation();
     }
-}
-
-#ifdef JS_CODEGEN_ARM64
-void MacroAssembler::initScrambleRetaddr(size_t cookie)
-{   hasRetCookie_ = false;    }
-void MacroAssembler::xorSP(void) {}
-void MacroAssembler::xorSPviaBP(void) {}
-
-#else
-void MacroAssembler::initScrambleRetaddr(size_t cookie)
-{
-    hasRetCookie_ = true;
-    //retCookie_ = random();
-    retCookie_ = cookie & (XORCOOKIE_MASK >> XORCOOKIE_SHIFT);
-}
-
-void MacroAssembler::xorSP(void)
-{
-    if (hasRetCookie_) {
-        const Operand retPtr = Operand(StackPointer, 0);
-        MacroAssemblerSpecific::xorl(Imm32(retCookie_), retPtr);
-
-        const Operand descriptorPtr = Operand(StackPointer, sizeof(size_t));
-        MacroAssemblerSpecific::orl(Imm32((retCookie_ << XORCOOKIE_SHIFT) + HASXORCOOKIE_BIT), descriptorPtr);
+    scramble_retaddr_ = scramble_retaddr;
+    if (scramble_retaddr) {
+        retCookie_ = random();
+        xor_retaddr();
     }
 }
 
-void MacroAssembler::xorSPviaBP(void)
-{
-    if (hasRetCookie_) {
-        const Operand retPtr = Operand(FramePointer, sizeof(size_t));
-        MacroAssemblerSpecific::xorl(Imm32(retCookie_), retPtr);
-
-        const Operand descriptorPtr = Operand(FramePointer, sizeof(size_t));
-        MacroAssemblerSpecific::orl(Imm32((retCookie_ << XORCOOKIE_SHIFT) + HASXORCOOKIE_BIT), descriptorPtr);
-    }
-}
-#endif
-
-MacroAssembler::AfterICSaveLive
+    MacroAssembler::AfterICSaveLive
 MacroAssembler::icSaveLive(LiveRegisterSet& liveRegs)
 {
     PushRegsInMask(liveRegs);
@@ -2284,13 +2251,13 @@ MacroAssembler::icSaveLive(LiveRegisterSet& liveRegs)
     return aic;
 }
 
-bool
+    bool
 MacroAssembler::icBuildOOLFakeExitFrame(void* fakeReturnAddr, AfterICSaveLive& aic)
 {
     return buildOOLFakeExitFrame(fakeReturnAddr);
 }
 
-void
+    void
 MacroAssembler::icRestoreLive(LiveRegisterSet& liveRegs, AfterICSaveLive& aic)
 {
     restoreFrameAlignmentForICArguments(aic);
@@ -2302,25 +2269,25 @@ MacroAssembler::icRestoreLive(LiveRegisterSet& liveRegs, AfterICSaveLive& aic)
 // ===============================================================
 // Stack manipulation functions.
 
-void
+    void
 MacroAssembler::PushRegsInMask(LiveGeneralRegisterSet set)
 {
     PushRegsInMask(LiveRegisterSet(set.set(), FloatRegisterSet()));
 }
 
-void
+    void
 MacroAssembler::PopRegsInMask(LiveRegisterSet set)
 {
     PopRegsInMaskIgnore(set, LiveRegisterSet());
 }
 
-void
+    void
 MacroAssembler::PopRegsInMask(LiveGeneralRegisterSet set)
 {
     PopRegsInMask(LiveRegisterSet(set.set(), FloatRegisterSet()));
 }
 
-void
+    void
 MacroAssembler::Push(jsid id, Register scratchReg)
 {
     if (JSID_IS_GCTHING(id)) {
@@ -2346,7 +2313,7 @@ MacroAssembler::Push(jsid id, Register scratchReg)
     }
 }
 
-void
+    void
 MacroAssembler::Push(TypedOrValueRegister v)
 {
     if (v.hasValue()) {
@@ -2363,7 +2330,7 @@ MacroAssembler::Push(TypedOrValueRegister v)
     }
 }
 
-void
+    void
 MacroAssembler::Push(ConstantOrRegister v)
 {
     if (v.constant())
@@ -2372,28 +2339,28 @@ MacroAssembler::Push(ConstantOrRegister v)
         Push(v.reg());
 }
 
-void
+    void
 MacroAssembler::Push(const ValueOperand& val)
 {
     pushValue(val);
     framePushed_ += sizeof(Value);
 }
 
-void
+    void
 MacroAssembler::Push(const Value& val)
 {
     pushValue(val);
     framePushed_ += sizeof(Value);
 }
 
-void
+    void
 MacroAssembler::Push(JSValueType type, Register reg)
 {
     pushValue(type, reg);
     framePushed_ += sizeof(Value);
 }
 
-void
+    void
 MacroAssembler::PushValue(const Address& addr)
 {
     MOZ_ASSERT(addr.base != getStackPointer());
@@ -2401,46 +2368,46 @@ MacroAssembler::PushValue(const Address& addr)
     framePushed_ += sizeof(Value);
 }
 
-void
+    void
 MacroAssembler::PushEmptyRooted(VMFunction::RootType rootType)
 {
     switch (rootType) {
-      case VMFunction::RootNone:
-        MOZ_CRASH("Handle must have root type");
-      case VMFunction::RootObject:
-      case VMFunction::RootString:
-      case VMFunction::RootPropertyName:
-      case VMFunction::RootFunction:
-      case VMFunction::RootCell:
-        Push(ImmPtr(nullptr));
-        break;
-      case VMFunction::RootValue:
-        Push(UndefinedValue());
-        break;
+        case VMFunction::RootNone:
+            MOZ_CRASH("Handle must have root type");
+        case VMFunction::RootObject:
+        case VMFunction::RootString:
+        case VMFunction::RootPropertyName:
+        case VMFunction::RootFunction:
+        case VMFunction::RootCell:
+            Push(ImmPtr(nullptr));
+            break;
+        case VMFunction::RootValue:
+            Push(UndefinedValue());
+            break;
     }
 }
 
-void
+    void
 MacroAssembler::popRooted(VMFunction::RootType rootType, Register cellReg,
-                          const ValueOperand& valueReg)
+        const ValueOperand& valueReg)
 {
     switch (rootType) {
-      case VMFunction::RootNone:
-        MOZ_CRASH("Handle must have root type");
-      case VMFunction::RootObject:
-      case VMFunction::RootString:
-      case VMFunction::RootPropertyName:
-      case VMFunction::RootFunction:
-      case VMFunction::RootCell:
-        Pop(cellReg);
-        break;
-      case VMFunction::RootValue:
-        Pop(valueReg);
-        break;
+        case VMFunction::RootNone:
+            MOZ_CRASH("Handle must have root type");
+        case VMFunction::RootObject:
+        case VMFunction::RootString:
+        case VMFunction::RootPropertyName:
+        case VMFunction::RootFunction:
+        case VMFunction::RootCell:
+            Pop(cellReg);
+            break;
+        case VMFunction::RootValue:
+            Pop(valueReg);
+            break;
     }
 }
 
-void
+    void
 MacroAssembler::adjustStack(int amount)
 {
     if (amount > 0)
@@ -2449,7 +2416,7 @@ MacroAssembler::adjustStack(int amount)
         reserveStack(-amount);
 }
 
-void
+    void
 MacroAssembler::freeStack(uint32_t amount)
 {
     MOZ_ASSERT(amount <= framePushed_);
@@ -2458,7 +2425,7 @@ MacroAssembler::freeStack(uint32_t amount)
     framePushed_ -= amount;
 }
 
-void
+    void
 MacroAssembler::freeStack(Register amount)
 {
     addToStackPtr(amount);
@@ -2467,7 +2434,7 @@ MacroAssembler::freeStack(Register amount)
 // ===============================================================
 // ABI function calls.
 
-void
+    void
 MacroAssembler::setupABICall()
 {
 #ifdef DEBUG
@@ -2503,7 +2470,7 @@ MacroAssembler::setupABICall()
 #endif
 }
 
-void
+    void
 MacroAssembler::setupAlignedABICall()
 {
     setupABICall();
@@ -2515,7 +2482,7 @@ MacroAssembler::setupAlignedABICall()
 #endif
 }
 
-void
+    void
 MacroAssembler::passABIArg(const MoveOperand& from, MoveOp::Type type)
 {
     MOZ_ASSERT(inCall_);
@@ -2523,17 +2490,17 @@ MacroAssembler::passABIArg(const MoveOperand& from, MoveOp::Type type)
 
     ABIArg arg;
     switch (type) {
-      case MoveOp::FLOAT32:
-        arg = abiArgs_.next(MIRType_Float32);
-        break;
-      case MoveOp::DOUBLE:
-        arg = abiArgs_.next(MIRType_Double);
-        break;
-      case MoveOp::GENERAL:
-        arg = abiArgs_.next(MIRType_Pointer);
-        break;
-      default:
-        MOZ_CRASH("Unexpected argument type");
+        case MoveOp::FLOAT32:
+            arg = abiArgs_.next(MIRType_Float32);
+            break;
+        case MoveOp::DOUBLE:
+            arg = abiArgs_.next(MIRType_Double);
+            break;
+        case MoveOp::GENERAL:
+            arg = abiArgs_.next(MIRType_Pointer);
+            break;
+        default:
+            MOZ_CRASH("Unexpected argument type");
     }
 
     MoveOperand to(*this, arg);
@@ -2545,7 +2512,7 @@ MacroAssembler::passABIArg(const MoveOperand& from, MoveOp::Type type)
     enoughMemory_ = moveResolver_.addMove(from, to, type);
 }
 
-void
+    void
 MacroAssembler::callWithABINoProfiler(void* fun, MoveOp::Type result)
 {
     appendSignatureType(result);
@@ -2559,7 +2526,7 @@ MacroAssembler::callWithABINoProfiler(void* fun, MoveOp::Type result)
     callWithABIPost(stackAdjust, result);
 }
 
-void
+    void
 MacroAssembler::callWithABINoProfiler(wasm::SymbolicAddress imm, MoveOp::Type result)
 {
     uint32_t stackAdjust;
@@ -2571,14 +2538,14 @@ MacroAssembler::callWithABINoProfiler(wasm::SymbolicAddress imm, MoveOp::Type re
 // ===============================================================
 // Exit frame footer.
 
-void
+    void
 MacroAssembler::linkExitFrame()
 {
     AbsoluteAddress jitTop(GetJitContext()->runtime->addressOfJitTop());
     storeStackPtr(jitTop);
 }
 
-void
+    void
 MacroAssembler::linkSelfReference(JitCode* code)
 {
     // If this code can transition to C++ code and witness a GC, then we need to store
@@ -2586,39 +2553,39 @@ MacroAssembler::linkSelfReference(JitCode* code)
     // be unset if the code never needed to push its JitCode*.
     if (hasSelfReference()) {
         PatchDataWithValueCheck(CodeLocationLabel(code, selfReferencePatch_),
-                                ImmPtr(code),
-                                ImmPtr((void*)-1));
+                ImmPtr(code),
+                ImmPtr((void*)-1));
     }
 }
 
 //}}} check_macroassembler_style
 
 namespace js {
-namespace jit {
+    namespace jit {
 
 #ifdef DEBUG
-template <class RegisterType>
-AutoGenericRegisterScope<RegisterType>::AutoGenericRegisterScope(MacroAssembler& masm, RegisterType reg)
-  : RegisterType(reg), masm_(masm)
-{
-    masm.debugTrackedRegisters_.add(reg);
-}
+        template <class RegisterType>
+            AutoGenericRegisterScope<RegisterType>::AutoGenericRegisterScope(MacroAssembler& masm, RegisterType reg)
+            : RegisterType(reg), masm_(masm)
+            {
+                masm.debugTrackedRegisters_.add(reg);
+            }
 
-template AutoGenericRegisterScope<Register>::AutoGenericRegisterScope(MacroAssembler& masm, Register reg);
-template AutoGenericRegisterScope<FloatRegister>::AutoGenericRegisterScope(MacroAssembler& masm, FloatRegister reg);
+        template AutoGenericRegisterScope<Register>::AutoGenericRegisterScope(MacroAssembler& masm, Register reg);
+        template AutoGenericRegisterScope<FloatRegister>::AutoGenericRegisterScope(MacroAssembler& masm, FloatRegister reg);
 #endif // DEBUG
 
 #ifdef DEBUG
-template <class RegisterType>
-AutoGenericRegisterScope<RegisterType>::~AutoGenericRegisterScope()
-{
-    const RegisterType& reg = *dynamic_cast<RegisterType*>(this);
-    masm_.debugTrackedRegisters_.take(reg);
-}
+        template <class RegisterType>
+            AutoGenericRegisterScope<RegisterType>::~AutoGenericRegisterScope()
+            {
+                const RegisterType& reg = *dynamic_cast<RegisterType*>(this);
+                masm_.debugTrackedRegisters_.take(reg);
+            }
 
-template AutoGenericRegisterScope<Register>::~AutoGenericRegisterScope();
-template AutoGenericRegisterScope<FloatRegister>::~AutoGenericRegisterScope();
+        template AutoGenericRegisterScope<Register>::~AutoGenericRegisterScope();
+        template AutoGenericRegisterScope<FloatRegister>::~AutoGenericRegisterScope();
 #endif // DEBUG
 
-} // namespace jit
+    } // namespace jit
 } // namespace js

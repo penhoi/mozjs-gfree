@@ -211,10 +211,12 @@ void
 MacroAssembler::makeFrameDescriptor(Register frameSizeReg, FrameType type)
 {
     // See JitFrames.h for a description of the frame descriptor format.
-
     lshiftPtr(Imm32(FRAMESIZE_SHIFT), frameSizeReg);
     // The saved-frame bit is zero for new frames. See js::SavedStacks.
-    orPtr(Imm32(type), frameSizeReg);
+    //if (hasRetCookie_)
+    	//orPtr(Imm32(type + (retCookie_ & XORCOOKIE_MASK) + HASXORCOOKIE_BIT), frameSizeReg);
+    //else
+    	orPtr(Imm32(type), frameSizeReg);
 }
 
 void
