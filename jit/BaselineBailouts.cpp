@@ -1804,6 +1804,8 @@ jit::FinishBailoutToBaseline(BaselineBailoutInfo* bailoutInfo)
     if (cx->runtime()->jitRuntime()->isProfilerInstrumentationEnabled(cx->runtime()))
         cx->runtime()->jitActivation->setLastProfilingFrame(iter.prevFp());
 
+    BaselineScript *bs;
+    size_t cookie;
     uint32_t frameno = 0;
     while (frameno < numFrames) {
         MOZ_ASSERT(!iter.isIonJS());
@@ -1841,24 +1843,17 @@ jit::FinishBailoutToBaseline(BaselineBailoutInfo* bailoutInfo)
                 outerFp = iter.fp();
             }
 
-
-
-            if (JSOp(*resumePC) != JSOP_LOOPENTRY) {
-              /*BaselineScript *bs = frame->script()->baselineScript();
-              size_t *ptrRet;
-              size_t cookie;
-              if (bs->getRetCookie(&cookie)) {
-              ptrRet = (size_t*)iter.fp();
-             *ptrRet = *ptrRet ^ cookie;
-
-             }*/
-
-
+            bs = frame->script()->baselineScript();
+            if (bs->getRetCookie(&cookie)) {
+                if (frameno + 1 < numFrames)
+                    iter.current()->dexorReturnAddress();
+                // frameno == numFrames - 1
+                else if (JSOp(*resumePC) != JSOP_LOOPENTRY) {
+                    iter.current()->xorReturnAddress(cookie);
+                }
             }
             frameno++;
         }
-        if ((JSOp(*resumePC) != JSOP_LOOPENTRY) and frameno != numFrames)
-        iter.current()->dexorReturnAddress();
         ++iter;
     }
 

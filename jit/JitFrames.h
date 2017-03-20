@@ -373,10 +373,16 @@ class CommonFrameLayout
         returnAddress_ = addr;
         descriptor_ ^= HASXORCOOKIE_BIT;	// set to no XORCOOKIE
     }
+    void xorReturnAddress(size_t cookie) {
+        size_t addr = (size_t)returnAddress_;
+        cookie &= XORCOOKIE_MASK >> XORCOOKIE_SHIFT;
+        returnAddress_ = (uint8_t*) (addr ^ cookie);
+        descriptor_ |= (cookie << XORCOOKIE_SHIFT) + HASXORCOOKIE_BIT;
+    }
     void dexorReturnAddress() {
         if (descriptor_ & HASXORCOOKIE_BIT) {
             size_t cookie = (descriptor_ & XORCOOKIE_MASK) >> XORCOOKIE_SHIFT;
-            *(size_t*)returnAddress_ = (size_t)returnAddress_ ^ cookie;
+            returnAddress_ = (uint8_t*)((size_t)returnAddress_ ^ cookie);
             descriptor_ ^= HASXORCOOKIE_BIT;
         }
     }

@@ -245,11 +245,10 @@ DoWarmUpCounterFallback(JSContext* cx, BaselineFrame* frame, ICWarmUpCounter_Fal
     //As illustrated by  ICWarmUpCounter_Fallback::Compiler::generateStubCode; 
     //the execution-flow will osr into ion-code, so we de-xor the return-address here 
     //and thus ion code will get a clean value.
-    size_t cookie;
-    if (script->hasBaselineScript() && script->baselineScript()->getRetCookie(&cookie)) {
-        size_t *addr = (size_t*)frame->framePrefix();
-        *addr = *addr ^ cookie;
+    if (script->hasBaselineScript()) {
         JitSpew(JitSpew_BaselineOSR, "De-xored the return-address.");
+        JitFrameLayout* f = frame->framePrefix();
+        f->dexorReturnAddress();
     }
 
     return true;

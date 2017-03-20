@@ -100,7 +100,6 @@ JitFrameIterator::JitFrameIterator()
   : current_(nullptr),
     type_(JitFrame_Exit),
     returnAddressToFp_(nullptr),
-    deXorSP_(false),
     frameSize_(0),
     cachedSafepointIndex_(nullptr),
     activation_(nullptr)
@@ -111,7 +110,6 @@ JitFrameIterator::JitFrameIterator(JSContext* cx)
   : current_(cx->runtime()->jitTop),
     type_(JitFrame_Exit),
     returnAddressToFp_(nullptr),
-    deXorSP_(false),
     frameSize_(0),
     cachedSafepointIndex_(nullptr),
     activation_(cx->runtime()->activation()->asJit())
@@ -130,7 +128,6 @@ JitFrameIterator::JitFrameIterator(const ActivationIterator& activations)
   : current_(activations.jitTop()),
     type_(JitFrame_Exit),
     returnAddressToFp_(nullptr),
-    deXorSP_(false),
     frameSize_(0),
     cachedSafepointIndex_(nullptr),
     activation_(activations->asJit())
@@ -165,15 +162,15 @@ JitFrameIterator::checkInvalidation(IonScript** ionScriptOut) const
     // N.B. the current IonScript is not the same as the frame's
     // IonScript if the frame has since been invalidated.
     bool notInvalidated = script->hasIonScript() &&
-                       script->ionScript()->containsReturnAddress(returnAddr);
+        script->ionScript()->containsReturnAddress(returnAddr);
     if (notInvalidated)
         return false;
 
-/*    size_t cookie;
-    uint8_t* addr;
-    if (script->hasIonScript() && script->ionScript()->getRetCookie(&cookie) ) {
-        addr = (uint8_t*)((size_t)returnAddr ^ cookie);
-        //Preceded by a call instruction
+    /*    size_t cookie;
+          uint8_t* addr;
+          if (script->hasIonScript() && script->ionScript()->getRetCookie(&cookie) ) {
+          addr = (uint8_t*)((size_t)returnAddr ^ cookie);
+    //Preceded by a call instruction
         notInvalidated = script->ionScript()->containsReturnAddress(addr) &&
             ((addr[-2] == 0xff && (addr[-1] & 0x38) == 0x10) || addr[-5] == 0xe8);
         if (notInvalidated) {
@@ -260,15 +257,6 @@ JitFrameIterator::baselineScriptAndPc(JSScript** scriptRes, jsbytecode** pcRes) 
     ICEntry& icEntry = script->baselineScript()->icEntryFromReturnAddress(retAddr);
     *pcRes = icEntry.pc(script);
 }
-
-/*void
-JitFrameIterator::setReturnAddressToFp(uint8_t* addr)
-{
-    if (!deXorSP_) {
-       returnAddressToFp_ = addr;
-       deXorSP_ = true;
-    }
-}*/
 
 Value*
 JitFrameIterator::actualArgs() const
@@ -863,6 +851,7 @@ HandleException(ResumeFromException* rfe)
     // iterating, we need a variant here that is automatically updated should
     // on-stack recompilation occur.
     DebugModeOSRVolatileJitFrameIterator iter(cx);
+    BaselineScript *bs;
     bool hasCookie = false;
     size_t cookie;
     while (!iter.isEntry()) {
@@ -937,6 +926,8 @@ HandleException(ResumeFromException* rfe)
             if (rfe->kind != ResumeFromException::RESUME_ENTRY_FRAME &&
                 rfe->kind != ResumeFromException::RESUME_FORCED_RETURN)
             {
+                //if (rfe->kind == ResumeFromException::RESUME_CATCH)
+                //    iter.current()->dexorReturnAddress();
                 return;
             }
 
@@ -958,19 +949,24 @@ HandleException(ResumeFromException* rfe)
                   }*/
                 return;
             }
-            hasCookie = (script != nullptr) && 
-                script->hasBaselineScript() &&
-                script->baselineScript()->getRetCookie(&cookie) &&
-                (JSOp(*pc) != JSOP_LOOPENTRY);
-            /*if (hasCookie && JSOp(*pc) != JSOP_LOOPENTRY) {
-                  size_t addr = (size_t)iter.fp();
-                  addr = addr ^ cookie;
-                  iter.setReturnAddressToFp((uint8_t*)&addr);
+            //if (iter.isScripted())
+            //    iter.jsFrame()->dexorReturnAddress();
+
+            /*if (script->hasBaselineScript() && script->baselineScript()->getRetCookie(&cookie)) {
+                //  hasCookie = (script != nullptr) && 
+                //  (JSOp(*pc) != JSOP_LOOPENTRY);
+                //if (JSOp(*pc) != JSOP_LOOPENTRY) {
+                iter.jsFrame()->dexorReturnAddress();
+                //      size_t addr = (size_t)iter.fp();
+                //    addr = addr ^ cookie;
+                //  iter.setReturnAddressToFp((uint8_t*)&addr);
             }*/
 
         }
 
         JitFrameLayout* current = iter.isScripted() ? iter.jsFrame() : nullptr;
+            if (current != nullptr)
+                current->dexorReturnAddress();
 
         ++iter;
 
@@ -994,9 +990,15 @@ HandleException(ResumeFromException* rfe)
         }
     }
 
+        if  (iter.isScripted())
+                iter.jsFrame()->dexorReturnAddress();
+            //if (script->hasBaselineScript() && script->baselineScript()->getRetCookie(&cookie)) {
+            //    iter.jsFrame()->dexorReturnAddress();
+           // }
+
     rfe->stackPointer = iter.fp();
-    if (hasCookie)
-        *(size_t*)rfe->stackPointer = *(size_t*)rfe->stackPointer ^ cookie;
+    //if (hasCookie)
+    //    *(size_t*)rfe->stackPointer = *(size_t*)rfe->stackPointer ^ cookie;
     //    size_t *ptrStack = (size_t*)iter.fp();
     //*ptrStack = *ptrStack ^ cookie;
 }

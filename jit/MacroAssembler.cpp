@@ -2269,7 +2269,7 @@ void MacroAssembler::xorSPviaBP(void)
         const Operand retPtr = Operand(FramePointer, sizeof(size_t));
         MacroAssemblerSpecific::xorl(Imm32(retCookie_), retPtr);
 
-        const Operand descriptorPtr = Operand(FramePointer, sizeof(size_t));
+        const Operand descriptorPtr = Operand(FramePointer, 2*sizeof(size_t));
         MacroAssemblerSpecific::orl(Imm32((retCookie_ << XORCOOKIE_SHIFT) + HASXORCOOKIE_BIT), descriptorPtr);
     }
 }

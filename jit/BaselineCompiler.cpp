@@ -950,7 +950,7 @@ BaselineCompiler::emitProfilerExitFrame()
     // Starts off initially disabled.
     Label noInstrument;
     CodeOffset toggleOffset = masm.toggledJump(&noInstrument);
-    masm.xorSP();
+    //masm.xorSP();
     masm.profilerExitFrame();
     masm.bind(&noInstrument);
 
