@@ -1765,6 +1765,8 @@ jit::FinishBailoutToBaseline(BaselineBailoutInfo* bailoutInfo)
     uint32_t numFrames = bailoutInfo->numFrames;
     MOZ_ASSERT(numFrames > 0);
     BailoutKind bailoutKind = bailoutInfo->bailoutKind;
+    //jsbytecode* resumePC = bailoutInfo->resumePC;
+    //ICStub* mStub = bailoutInfo->monitorStub;
 
     // Free the bailout buffer.
     js_free(bailoutInfo);
@@ -1827,10 +1829,10 @@ jit::FinishBailoutToBaseline(BaselineBailoutInfo* bailoutInfo)
                 outerScript = frame->script();
                 outerFp = iter.fp();
             }
-
+            //if ((frameno < numFrames)/* && (JSOp(*resumePC) != JSOP_LOOPENTRY) && mStub != nullptr*/)
+            iter.current()->encryptReturnAddress();
             frameno++;
         }
-
         ++iter;
     }
 

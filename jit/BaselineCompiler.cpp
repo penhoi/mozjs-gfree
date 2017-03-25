@@ -34,11 +34,30 @@ using namespace js;
 using namespace js::jit;
 
 using mozilla::AssertedCast;
+#if 0
+#define masmprintf(str) \
+AllocatableGeneralRegisterSet regs(GeneralRegisterSet::All()); \
+Register scratch = regs.takeAny();                      \
+masm.setupUnalignedABICall(scratch);                    \
+masm.movePtr(ImmPtr(str), scratch);                     \
+masm.passABIArg(scratch);                               \
+masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, printf));   
+
+#define masmprintfnext(str) \
+masm.setupUnalignedABICall(scratch);                    \
+masm.movePtr(ImmPtr(str), scratch);                     \
+masm.passABIArg(scratch);                               \
+masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, printf));   
+#else
+#define masmprintf(str)
+#define masmprintfnext(str)
+#endif 
 
 BaselineCompiler::BaselineCompiler(JSContext* cx, TempAllocator& alloc, JSScript* script)
-  : BaselineCompilerSpecific(cx, alloc, script),
+: BaselineCompilerSpecific(cx, alloc, script),
     yieldOffsets_(cx),
-    modifiesArguments_(false)
+    modifiesArguments_(false),
+    skipEncryptRetAddr_(nullptr)
 {
 }
 
@@ -413,7 +432,8 @@ BaselineCompiler::emitPrologue()
     if (!emitTraceLoggerEnter())
         return false;
 #endif
-
+    masm.initRetCookie();
+    masm.encryptReturnAddress(ViaBP);
     // Record the offset of the prologue, because Ion can bailout before
     // the scope chain is initialized.
     prologueOffset_ = CodeOffset(masm.currentOffset());
@@ -475,7 +495,7 @@ bool
 BaselineCompiler::emitOutOfLinePostBarrierSlot()
 {
     masm.bind(&postBarrierSlot_);
-
+    masm.freeRetCookie();
     Register objReg = R2.scratchReg();
     AllocatableGeneralRegisterSet regs(GeneralRegisterSet::All());
     regs.take(R0);
@@ -902,6 +922,7 @@ BaselineCompiler::emitProfilerExitFrame()
     // Starts off initially disabled.
     Label noInstrument;
     CodeOffset toggleOffset = masm.toggledJump(&noInstrument);
+    masm.decryptReturnAddress();
     masm.profilerExitFrame();
     masm.bind(&noInstrument);
 
@@ -954,9 +975,11 @@ BaselineCompiler::emitBody()
             frame.syncStack(2);
 
         frame.assertValidState(*info);
-
         masm.bind(labelOf(pc));
-
+        if (op == JSOP_LOOPENTRY) {
+            skipEncryptRetAddr_ = new Label;
+            masm.toggledJump(skipEncryptRetAddr_);
+        }
         // Add a PC -> native mapping entry for the current op. These entries are
         // used when we need the native code address for a given pc, for instance
         // for bailouts from Ion, the debugger and exception handling. See
@@ -1243,6 +1266,12 @@ BaselineCompiler::emit_JSOP_LOOPHEAD()
 bool
 BaselineCompiler::emit_JSOP_LOOPENTRY()
 {
+    masm.encryptReturnAddress(ViaBP);
+    masm.bind(skipEncryptRetAddr_);
+    if (skipEncryptRetAddr_ != nullptr) {
+        delete skipEncryptRetAddr_;
+        skipEncryptRetAddr_ = nullptr;
+    }
     frame.syncStack(0);
     return emitWarmUpCounterIncrement(LoopEntryCanIonOsr(pc));
 }
@@ -4098,7 +4127,8 @@ BaselineCompiler::emit_JSOP_RESUME()
 #ifdef JS_USE_LINK_REGISTER
     masm.pushReturnAddress();
 #endif
-
+    //The new return address needs be encrypted.
+    masm.encryptReturnAddress(ViaSP);
     // If profiler instrumentation is on, update lastProfilingFrame on
     // current JitActivation
     {

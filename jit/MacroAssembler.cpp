@@ -2216,6 +2216,7 @@ MacroAssembler::MacroAssembler(JSContext* cx, IonScript* ion,
 #ifdef DEBUG
     inCall_(false),
 #endif
+    retCookie_(0),
     emitProfilingInstrumentation_(false)
 {
     constructRoot(cx);
@@ -2234,6 +2235,119 @@ MacroAssembler::MacroAssembler(JSContext* cx, IonScript* ion,
         if (pc && cx->runtime()->spsProfiler.enabled())
             enableProfilingInstrumentation();
     }
+}
+
+void
+MacroAssembler::initRetCookie(uint32_t cookie)
+{
+    cookie = 0;
+#if defined(JS_CODEGEN_X86) || defined(JS_CODEGEN_X64)
+    //retCookie_ = random();
+    retCookie_ = (cookie & UINT32_MAX) | RETCOOKIE_FLAG;
+#else
+    retCookie_ = 0;
+#endif
+}
+
+void
+MacroAssembler::freeRetCookie(void)
+{   
+    retCookie_ = 0;    
+}
+
+void 
+MacroAssembler::xorSP(void)
+{
+#if defined(JS_CODEGEN_X86) || defined(JS_CODEGEN_X64)
+    if (retCookie_ & RETCOOKIE_FLAG) {
+#if defined(JS_CODEGEN_X86)
+        const Operand retPtr = Operand(StackPointer, 0);
+#elif defined(JS_CODEGEN_X64)
+        const Operand retPtr = Operand(StackPointer, sizeof(uint32_t));
+#endif
+#endif
+
+        MacroAssemblerSpecific::xorl(Imm32(retCookie_), retPtr);
+#if defined(JS_CODEGEN_X86) || defined(JS_CODEGEN_X64)
+    }
+#endif
+}
+
+void 
+MacroAssembler::xorSPviaBP(void)
+{
+#if defined(JS_CODEGEN_X86) || defined(JS_CODEGEN_X64)
+    if (retCookie_ & RETCOOKIE_FLAG) {
+#if defined(JS_CODEGEN_X86)
+        const Operand retPtr = Operand(FramePointer, 2*sizeof(uint32_t));
+#elif defined(JS_CODEGEN_X64)
+        const Operand retPtr = Operand(FramePointer, 3*sizeof(uint32_t));
+#endif
+#endif
+
+        MacroAssemblerSpecific::xorl(Imm32(retCookie_), retPtr);
+#if defined(JS_CODEGEN_X86) || defined(JS_CODEGEN_X64)
+    }
+#endif
+}
+
+void 
+MacroAssembler::encryptReturnAddress(encryptReturnAddressViaReg reg)
+{
+    if (reg == ViaSP)
+        xorSP();
+    else if (reg == ViaBP)
+        xorSPviaBP();
+}
+
+void
+MacroAssembler::decryptReturnAddress(encryptReturnAddressViaReg reg)
+{
+    if (reg == ViaSP)
+        xorSP();
+    else if (reg == ViaBP)
+        xorSPviaBP();
+}
+
+void
+MacroAssembler::ret(void)
+{
+#if defined(JS_CODEGEN_X86) || defined(JS_CODEGEN_X64)
+    if (retCookie_ & RETCOOKIE_FLAG) {
+#if defined(JS_CODEGEN_X86)
+        const Operand retPtr = Operand(StackPointer, 0);
+#elif defined(JS_CODEGEN_X64)
+        const Operand retPtr = Operand(StackPointer, sizeof(uint32_t));
+#endif
+
+        MacroAssemblerSpecific::xorl(Imm32(retCookie_), retPtr);
+    }
+#endif
+    MacroAssemblerSpecific::ret();
+}
+
+void
+MacroAssembler::retn(Imm32 n)
+{
+#if defined(JS_CODEGEN_X86) || defined(JS_CODEGEN_X64)
+    if (retCookie_ & RETCOOKIE_FLAG) {
+#if defined(JS_CODEGEN_X86)
+        const Operand retPtr = Operand(StackPointer, 0);
+#elif defined(JS_CODEGEN_X64)
+        const Operand retPtr = Operand(StackPointer, sizeof(uint32_t));
+#endif
+
+        MacroAssemblerSpecific::xorl(Imm32(retCookie_), retPtr);
+    }
+#endif
+    MacroAssemblerSpecific::retn(n);
+}
+
+bool
+MacroAssembler::getRetCookie(uint32_t *cookie)
+{
+    *cookie = retCookie_;
+    return retCookie_ & RETCOOKIE_FLAG;
 }
 
 MacroAssembler::AfterICSaveLive

@@ -866,7 +866,7 @@ HandleException(ResumeFromException* rfe)
 
                 JSScript* script = frames.script();
                 probes::ExitScript(cx, script, script->functionNonDelazifying(),
-                                   /* popSPSFrame = */ false);
+                        /* popSPSFrame = */ false);
                 if (!frames.more()) {
                     TraceLogStopEvent(logger, TraceLogger_IonMonkey);
                     TraceLogStopEvent(logger, TraceLogger_Scripts);
@@ -916,10 +916,13 @@ HandleException(ResumeFromException* rfe)
             // Unwind profiler pseudo-stack
             JSScript* script = iter.script();
             probes::ExitScript(cx, script, script->functionNonDelazifying(),
-                               /* popSPSFrame = */ false);
+                    /* popSPSFrame = */ false);
 
-            if (rfe->kind == ResumeFromException::RESUME_FORCED_RETURN)
+            if (rfe->kind == ResumeFromException::RESUME_FORCED_RETURN) {
+                if (iter.isScripted() && iter.jsFrame())
+                    iter.jsFrame()->decryptReturnAddress();
                 return;
+            }
         }
 
         JitFrameLayout* current = iter.isScripted() ? iter.jsFrame() : nullptr;
@@ -927,6 +930,7 @@ HandleException(ResumeFromException* rfe)
         ++iter;
 
         if (current) {
+		    current->decryptReturnAddress();
             // Unwind the frame by updating jitTop. This is necessary so that
             // (1) debugger exception unwind and leave frame hooks don't see this
             // frame when they use ScriptFrameIter, and (2) ScriptFrameIter does
@@ -942,6 +946,8 @@ HandleException(ResumeFromException* rfe)
         }
     }
 
+    if (iter.isScripted() && iter.jsFrame())
+        iter.jsFrame()->decryptReturnAddress();
     rfe->stackPointer = iter.fp();
 }
 

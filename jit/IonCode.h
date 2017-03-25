@@ -22,6 +22,10 @@
 #include "vm/TraceLogging.h"
 #include "vm/TypeInference.h"
 
+#ifndef RETCOOKIE_FLAG
+#define RETCOOKIE_FLAG    0x80000000
+#endif
+
 namespace js {
 namespace jit {
 
@@ -36,6 +40,7 @@ class JitCode : public gc::TenuredCell
 {
   protected:
     uint8_t* code_;
+    uint32_t retCookie_;
     ExecutablePool* pool_;
     uint32_t bufferSize_;             // Total buffer size. Does not include headerSize_.
     uint32_t insnSize_;               // Instruction stream size.
@@ -62,6 +67,7 @@ class JitCode : public gc::TenuredCell
     JitCode(uint8_t* code, uint32_t bufferSize, uint32_t headerSize, ExecutablePool* pool,
             CodeKind kind)
       : code_(code),
+        retCookie_(0),
         pool_(pool),
         bufferSize_(bufferSize),
         insnSize_(0),
@@ -161,6 +167,15 @@ class JitCode : public gc::TenuredCell
 
   public:
     static inline ThingRootKind rootKind() { return THING_ROOT_JIT_CODE; }
+
+    void setRetCookie(uint32_t cookie) {
+        retCookie_ = cookie | RETCOOKIE_FLAG;
+    }
+
+    bool getRetCookie (uint32_t *cookie) {
+        *cookie = retCookie_ & (~RETCOOKIE_FLAG);
+        return retCookie_ & RETCOOKIE_FLAG;
+    }
 };
 
 class SnapshotWriter;

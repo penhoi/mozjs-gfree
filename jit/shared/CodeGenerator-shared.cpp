@@ -120,6 +120,7 @@ CodeGeneratorShared::generatePrologue()
 #ifdef JS_USE_LINK_REGISTER
     masm.pushReturnAddress();
 #endif
+    masm.encryptReturnAddress(ViaSP);
 
     // If profiling, save the current frame pointer to a per-thread global field.
     if (isProfilerInstrumentationEnabled())
@@ -162,6 +163,7 @@ CodeGeneratorShared::generateEpilogue()
 bool
 CodeGeneratorShared::generateOutOfLineCode()
 {
+    masm.freeRetCookie();
     for (size_t i = 0; i < outOfLineCode_.length(); i++) {
         // Add native => bytecode mapping entries for OOL sites.
         // Not enabled on asm.js yet since asm doesn't contain bytecode mappings.

@@ -242,6 +242,12 @@ DoWarmUpCounterFallback(JSContext* cx, BaselineFrame* frame, ICWarmUpCounter_Fal
         return false;
     *infoPtr = info;
 
+    //As illustrated by ICWarmUpCounter_Fallback::Compiler::generateStubCode; 
+    //the execution-flow will osr from baseline-code into ion-code, so we de-xor 
+    //the return-address here and such that ion code will get a clean value.
+    if (frame->framePrefix())
+    	frame->framePrefix()->decryptReturnAddress();
+
     return true;
 }
 

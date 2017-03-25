@@ -358,10 +358,53 @@ class CommonFrameLayout
         descriptor_ |= HASCACHEDSAVEDFRAME_BIT;
     }
     uint8_t* returnAddress() const {
+#if defined(JS_CODEGEN_X86) || defined(JS_CODEGEN_X64)
+        uint8_t *addr = returnAddress_;
+        uint32_t *retPtr = (uint32_t*)&addr;
+#if defined(JS_CODEGEN_X64)
+        retPtr++;
+#endif
+        if (*retPtr & RETCOOKIE_FLAG) {
+            //Fixme: finding the cookie
+            uint32_t cookie = RETCOOKIE_FLAG;
+            *retPtr = *retPtr ^ cookie;
+        }
+        __asm__ __volatile__ ("" ::: "memory");
+        return addr;
+#else
         return returnAddress_;
+#endif
     }
     void setReturnAddress(uint8_t* addr) {
         returnAddress_ = addr;
+    }
+    void encryptReturnAddress(void) {
+#if defined(JS_CODEGEN_X86) || defined(JS_CODEGEN_X64)
+        uint32_t *retPtr = (uint32_t*)&returnAddress_;
+#if defined(JS_CODEGEN_X64)
+        retPtr++;
+#endif
+        //Fixme: finding the cookie
+        //cookie = cookie & UINT32_MAX;
+        uint32_t cookie = 0;
+        *retPtr = (*retPtr ^ cookie) | RETCOOKIE_FLAG;
+        __asm__ __volatile__ ("" ::: "memory");
+#endif
+    }
+    void decryptReturnAddress() {
+#if defined(JS_CODEGEN_X86) || defined(JS_CODEGEN_X64)
+        uint32_t *retPtr = (uint32_t*)&returnAddress_;
+#if defined(JS_CODEGEN_X64)
+        retPtr ++;
+#endif
+        if (*retPtr & RETCOOKIE_FLAG) {
+            //Fixme: finding the cookie
+            //uint32_t cookie = cookie & UINT32_MAX;
+            uint32_t cookie = 0;
+            *retPtr = (*retPtr ^ cookie) & (~RETCOOKIE_FLAG);
+        }
+        __asm__ __volatile__ ("" ::: "memory");
+#endif
     }
 };
 

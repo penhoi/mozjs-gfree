@@ -75,6 +75,7 @@ UNIFIED_SOURCES += [
     'testSavedStacks.cpp',
     'testScriptInfo.cpp',
     'testScriptObject.cpp',
+    'testSecurity.cpp',
     'testSetProperty.cpp',
     'testSetPropertyIgnoringNamedGetter.cpp',
     'testSourcePolicy.cpp',

@@ -2137,10 +2137,14 @@ void
 CodeGenerator::visitOsrEntry(LOsrEntry* lir)
 {
     Register temp = ToRegister(lir->temp());
-
+    Label skipEncrypt;
+    
+    masm.toggledJump(&skipEncrypt);
     // Remember the OSR entry offset into the code buffer.
     masm.flushBuffer();
     setOsrEntryOffset(masm.size());
+    masm.encryptReturnAddress(ViaBP);
+    masm.bind(&skipEncrypt);
 
 #ifdef JS_TRACE_LOGGING
     emitTracelogStopEvent(TraceLogger_Baseline);

@@ -182,11 +182,18 @@
 #define IMM32_16ADJ(X) X
 #endif
 
+#define RETCOOKIE_FLAG 0x80000000
+
 namespace js {
 namespace jit {
 
 // Defined in JitFrames.h
 enum ExitFrameTokenValues;
+
+enum encryptReturnAddressViaReg{
+    ViaSP = 0,
+    ViaBP = 1,
+};
 
 // The public entrypoint for emitting assembly. Note that a MacroAssembler can
 // use cx->lifoAlloc, so take care not to interleave masm use with other
@@ -351,6 +358,7 @@ class MacroAssembler : public MacroAssemblerSpecific
 #ifdef DEBUG
         inCall_(false),
 #endif
+        retCookie_(0),
         emitProfilingInstrumentation_(false)
     {
         JitContext* jcx = GetJitContext();
@@ -386,6 +394,7 @@ class MacroAssembler : public MacroAssemblerSpecific
 #ifdef DEBUG
         inCall_(false),
 #endif
+        retCookie_(0),
         emitProfilingInstrumentation_(false)
     {
         if (alloc)
@@ -580,6 +589,7 @@ class MacroAssembler : public MacroAssemblerSpecific
     // Flag use to assert that we use ABI function in the right context.
     bool inCall_;
 #endif
+    uint32_t retCookie_;
 
     // If set by setupUnalignedABICall then callWithABI will pop the stack
     // register which is on the stack.
@@ -1668,6 +1678,20 @@ class MacroAssembler : public MacroAssemblerSpecific
         bind(&ok);
 #endif
     }
+
+  private:
+    void xorSP(void);
+    void xorSPviaBP(void);
+
+  public:
+    void initRetCookie(uint32_t cookie = 0);
+    void freeRetCookie(void);
+    bool getRetCookie(uint32_t *cookie);
+
+    void encryptReturnAddress(encryptReturnAddressViaReg = ViaSP);
+    void decryptReturnAddress(encryptReturnAddressViaReg = ViaSP);
+    void ret(void);
+    void retn(Imm32 n);
 };
 
 static inline Assembler::DoubleCondition
