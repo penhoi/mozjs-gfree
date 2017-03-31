@@ -815,6 +815,10 @@ class AssemblerShared
 
         return !oom();
     }
+
+    virtual Register getRandomizedRegister(Register org) const {
+        return org;
+    }
 };
 
 } // namespace jit

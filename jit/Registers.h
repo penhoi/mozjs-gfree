@@ -29,6 +29,8 @@
 namespace js {
 namespace jit {
 
+class AssemblerShared;
+
 struct Register {
     typedef Registers Codes;
     typedef Codes::Encoding Encoding;
@@ -49,13 +51,11 @@ struct Register {
     MOZ_CONSTEXPR Code code() const {
         return Code(reg_);
     }
-    Encoding encoding() const {
-        MOZ_ASSERT(Code(reg_) < Registers::Total);
-        return reg_;
-    }
-    const char* name() const {
-        return Registers::GetName(code());
-    }
+
+    Encoding encoding(const AssemblerShared *asmer) const;
+	
+    const char* name(const AssemblerShared *asmer = nullptr) const;
+
     bool operator ==(Register other) const {
         return reg_ == other.reg_;
     }

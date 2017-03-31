@@ -25,6 +25,17 @@
 using namespace js;
 using namespace js::jit;
 
+Operand::Operand(const AssemblerShared* asmer, FloatRegister reg)
+: asmer_(asmer), 
+    kind_(FPREG),
+    scale_(TimesOne),
+    index_(Registers::Invalid),
+    disp_(0)
+{
+    const AssemblerX86Shared *as = static_cast<const AssemblerX86Shared*>(asmer);
+    base_ = reg.encoding(const_cast<AssemblerX86Shared*>(as));
+}
+
 void
 AssemblerX86Shared::copyJumpRelocationTable(uint8_t* dest)
 {

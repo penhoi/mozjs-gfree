@@ -32,6 +32,9 @@ JitCode*
 JitRuntime::generateEnterJIT(JSContext* cx, EnterJitType type)
 {
     MacroAssembler masm(cx);
+    if (type == EnterJitBaseline)
+    masm.randomizeRegisterAllocation();
+
     masm.assertStackAlignment(ABIStackAlignment, -int32_t(sizeof(uintptr_t)) /* return address */);
 
     const Register reg_code  = IntArgReg0;
@@ -40,15 +43,15 @@ JitRuntime::generateEnterJIT(JSContext* cx, EnterJitType type)
     MOZ_ASSERT(OsrFrameReg == IntArgReg3);
 
 #if defined(_WIN64)
-    const Operand token  = Operand(rbp, 16 + ShadowStackSpace);
-    const Operand scopeChain = Operand(rbp, 24 + ShadowStackSpace);
-    const Operand numStackValuesAddr = Operand(rbp, 32 + ShadowStackSpace);
-    const Operand result = Operand(rbp, 40 + ShadowStackSpace);
+    const Operand token  = Operand(&masm, rbp, 16 + ShadowStackSpace);
+    const Operand scopeChain = Operand(&masm, rbp, 24 + ShadowStackSpace);
+    const Operand numStackValuesAddr = Operand(&masm, rbp, 32 + ShadowStackSpace);
+    const Operand result = Operand(&masm, rbp, 40 + ShadowStackSpace);
 #else
     const Register token = IntArgReg4;
     const Register scopeChain = IntArgReg5;
-    const Operand numStackValuesAddr = Operand(rbp, 16 + ShadowStackSpace);
-    const Operand result = Operand(rbp, 24 + ShadowStackSpace);
+    const Operand numStackValuesAddr = Operand(&masm, rbp, 16 + ShadowStackSpace);
+    const Operand result = Operand(&masm, rbp, 24 + ShadowStackSpace);
 #endif
 
     // Save old stack frame pointer, set new stack frame pointer.
@@ -69,16 +72,16 @@ JitRuntime::generateEnterJIT(JSContext* cx, EnterJitType type)
     // 16-byte aligment for vmovdqa
     masm.subq(Imm32(16 * 10 + 8), rsp);
 
-    masm.vmovdqa(xmm6, Operand(rsp, 16 * 0));
-    masm.vmovdqa(xmm7, Operand(rsp, 16 * 1));
-    masm.vmovdqa(xmm8, Operand(rsp, 16 * 2));
-    masm.vmovdqa(xmm9, Operand(rsp, 16 * 3));
-    masm.vmovdqa(xmm10, Operand(rsp, 16 * 4));
-    masm.vmovdqa(xmm11, Operand(rsp, 16 * 5));
-    masm.vmovdqa(xmm12, Operand(rsp, 16 * 6));
-    masm.vmovdqa(xmm13, Operand(rsp, 16 * 7));
-    masm.vmovdqa(xmm14, Operand(rsp, 16 * 8));
-    masm.vmovdqa(xmm15, Operand(rsp, 16 * 9));
+    masm.vmovdqa(xmm6, Operand(&masm, rsp, 16 * 0));
+    masm.vmovdqa(xmm7, Operand(&masm, rsp, 16 * 1));
+    masm.vmovdqa(xmm8, Operand(&masm, rsp, 16 * 2));
+    masm.vmovdqa(xmm9, Operand(&masm, rsp, 16 * 3));
+    masm.vmovdqa(xmm10, Operand(&masm, rsp, 16 * 4));
+    masm.vmovdqa(xmm11, Operand(&masm, rsp, 16 * 5));
+    masm.vmovdqa(xmm12, Operand(&masm, rsp, 16 * 6));
+    masm.vmovdqa(xmm13, Operand(&masm, rsp, 16 * 7));
+    masm.vmovdqa(xmm14, Operand(&masm, rsp, 16 * 8));
+    masm.vmovdqa(xmm15, Operand(&masm, rsp, 16 * 9));
 #endif
 
     // Save arguments passed in registers needed after function call.
@@ -136,7 +139,7 @@ JitRuntime::generateEnterJIT(JSContext* cx, EnterJitType type)
         masm.j(AssemblerX86Shared::BelowOrEqual, &footer);
 
         masm.subq(Imm32(8), r13);
-        masm.push(Operand(r13, 0));
+        masm.push(Operand(&masm, r13, 0));
         masm.jmp(&header);
 
         masm.bind(&footer);
@@ -146,7 +149,7 @@ JitRuntime::generateEnterJIT(JSContext* cx, EnterJitType type)
     // actual number of arguments without adding an extra argument to the enter
     // JIT.
     masm.movq(result, reg_argc);
-    masm.unboxInt32(Operand(reg_argc, 0), reg_argc);
+    masm.unboxInt32(Operand(&masm, reg_argc, 0), reg_argc);
     masm.push(reg_argc);
 
     // Push the callee token.
@@ -234,11 +237,17 @@ JitRuntime::generateEnterJIT(JSContext* cx, EnterJitType type)
         masm.push(framePtr);
         masm.push(reg_code);
 
+        masm.push(rcx);
+        masm.push(rdx);
+
         masm.setupUnalignedABICall(scratch);
         masm.passABIArg(framePtr); // BaselineFrame
         masm.passABIArg(OsrFrameReg); // InterpreterFrame
         masm.passABIArg(numStackValues);
         masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, jit::InitBaselineFrameForOsr));
+
+        masm.pop(rdx);
+        masm.pop(rcx);
 
         masm.pop(reg_code);
         masm.pop(framePtr);
@@ -258,7 +267,7 @@ JitRuntime::generateEnterJIT(JSContext* cx, EnterJitType type)
             AbsoluteAddress addressOfEnabled(cx->runtime()->spsProfiler.addressOfEnabled());
             masm.branch32(Assembler::Equal, addressOfEnabled, Imm32(0),
                           &skipProfilingInstrumentation);
-            masm.lea(Operand(framePtr, sizeof(void*)), realFramePtr);
+            masm.lea(Operand(&masm, framePtr, sizeof(void*)), realFramePtr);
             masm.profilerEnterFrame(realFramePtr, scratch);
             masm.bind(&skipProfilingInstrumentation);
         }
@@ -302,20 +311,20 @@ JitRuntime::generateEnterJIT(JSContext* cx, EnterJitType type)
     Place return value where it belongs, pop all saved registers
     *****************************************************************/
     masm.pop(r12); // vp
-    masm.storeValue(JSReturnOperand, Operand(r12, 0));
+    masm.storeValue(JSReturnOperand, Operand(&masm, r12, 0));
 
     // Restore non-volatile registers.
 #if defined(_WIN64)
-    masm.vmovdqa(Operand(rsp, 16 * 0), xmm6);
-    masm.vmovdqa(Operand(rsp, 16 * 1), xmm7);
-    masm.vmovdqa(Operand(rsp, 16 * 2), xmm8);
-    masm.vmovdqa(Operand(rsp, 16 * 3), xmm9);
-    masm.vmovdqa(Operand(rsp, 16 * 4), xmm10);
-    masm.vmovdqa(Operand(rsp, 16 * 5), xmm11);
-    masm.vmovdqa(Operand(rsp, 16 * 6), xmm12);
-    masm.vmovdqa(Operand(rsp, 16 * 7), xmm13);
-    masm.vmovdqa(Operand(rsp, 16 * 8), xmm14);
-    masm.vmovdqa(Operand(rsp, 16 * 9), xmm15);
+    masm.vmovdqa(Operand(&masm, rsp, 16 * 0), xmm6);
+    masm.vmovdqa(Operand(&masm, rsp, 16 * 1), xmm7);
+    masm.vmovdqa(Operand(&masm, rsp, 16 * 2), xmm8);
+    masm.vmovdqa(Operand(&masm, rsp, 16 * 3), xmm9);
+    masm.vmovdqa(Operand(&masm, rsp, 16 * 4), xmm10);
+    masm.vmovdqa(Operand(&masm, rsp, 16 * 5), xmm11);
+    masm.vmovdqa(Operand(&masm, rsp, 16 * 6), xmm12);
+    masm.vmovdqa(Operand(&masm, rsp, 16 * 7), xmm13);
+    masm.vmovdqa(Operand(&masm, rsp, 16 * 8), xmm14);
+    masm.vmovdqa(Operand(&masm, rsp, 16 * 9), xmm15);
 
     masm.addq(Imm32(16 * 10 + 8), rsp);
 
@@ -375,7 +384,7 @@ JitRuntime::generateInvalidator(JSContext* cx)
     masm.pop(rbx); // Get the frameSize outparam.
 
     // Pop the machine state and the dead frame.
-    masm.lea(Operand(rsp, rbx, TimesOne, sizeof(InvalidationBailoutStack)), rsp);
+    masm.lea(Operand(&masm, rsp, rbx, TimesOne, sizeof(InvalidationBailoutStack)), rsp);
 
     // Jump to shared bailout tail. The BailoutInfo pointer has to be in r9.
     JitCode* bailoutTail = cx->runtime()->jitRuntime()->getBailoutTail();
@@ -412,7 +421,7 @@ JitRuntime::generateArgumentsRectifier(JSContext* cx, void** returnAddrOut)
     masm.loadPtr(Address(rsp, RectifierFrameLayout::offsetOfCalleeToken()), rax);
     masm.mov(rax, rcx);
     masm.andq(Imm32(uint32_t(CalleeTokenMask)), rcx);
-    masm.movzwl(Operand(rcx, JSFunction::offsetOfNargs()), rcx);
+    masm.movzwl(Operand(&masm, rcx, JSFunction::offsetOfNargs()), rcx);
 
     // Stash another copy in r11, since we are going to do destructive operations
     // on rcx
@@ -471,14 +480,14 @@ JitRuntime::generateArgumentsRectifier(JSContext* cx, void** returnAddrOut)
     // | - sizeof(Value)| is used to put rcx such that we can read the last
     // argument, and not the value which is after.
     BaseIndex b = BaseIndex(r9, r8, TimesEight, sizeof(RectifierFrameLayout) - sizeof(Value));
-    masm.lea(Operand(b), rcx);
+    masm.lea(Operand(&masm, b), rcx);
 
     // Copy & Push arguments, |nargs| + 1 times (to include |this|).
     {
         Label copyLoopTop;
 
         masm.bind(&copyLoopTop);
-        masm.push(Operand(rcx, 0x0));
+        masm.push(Operand(&masm, rcx, 0x0));
         masm.subq(Imm32(sizeof(Value)), rcx);
         masm.subl(Imm32(1), r8);
         masm.j(Assembler::NonZero, &copyLoopTop);
@@ -605,7 +614,7 @@ GenerateBailoutThunk(JSContext* cx, MacroAssembler& masm, uint32_t frameClass)
     static const uint32_t BailoutDataSize = sizeof(RegisterDump);
     masm.addq(Imm32(BailoutDataSize), rsp);
     masm.pop(rcx);
-    masm.lea(Operand(rsp, rcx, TimesOne, sizeof(void*)), rsp);
+    masm.lea(Operand(&masm, rsp, rcx, TimesOne, sizeof(void*)), rsp);
 
     // Jump to shared bailout tail. The BailoutInfo pointer has to be in r9.
     JitCode* bailoutTail = cx->runtime()->jitRuntime()->getBailoutTail();
@@ -672,7 +681,7 @@ JitRuntime::generateVMWrapper(JSContext* cx, const VMFunction& f)
     if (f.explicitArgs) {
         argsBase = r10;
         regs.take(argsBase);
-        masm.lea(Operand(rsp, ExitFrameLayout::SizeWithFooter()), argsBase);
+        masm.lea(Operand(&masm, rsp, ExitFrameLayout::SizeWithFooter()), argsBase);
     }
 
     // Reserve space for the outparameter.
@@ -1085,7 +1094,7 @@ JitRuntime::generateProfilerExitFrameTailStub(JSContext* cx)
 
         // Store return frame in lastProfilingFrame.
         // scratch2 := StackPointer + Descriptor.size*1 + JitFrameLayout::Size();
-        masm.lea(Operand(StackPointer, scratch1, TimesOne, JitFrameLayout::Size()), scratch2);
+        masm.lea(Operand(&masm, StackPointer, scratch1, TimesOne, JitFrameLayout::Size()), scratch2);
         masm.storePtr(scratch2, lastProfilingFrame);
         masm.ret();
     }
@@ -1174,7 +1183,7 @@ JitRuntime::generateProfilerExitFrameTailStub(JSContext* cx)
     masm.bind(&handle_Rectifier);
     {
         // scratch2 := StackPointer + Descriptor.size + JitFrameLayout::Size()
-        masm.lea(Operand(StackPointer, scratch1, TimesOne, JitFrameLayout::Size()), scratch2);
+        masm.lea(Operand(&masm, StackPointer, scratch1, TimesOne, JitFrameLayout::Size()), scratch2);
         masm.loadPtr(Address(scratch2, RectifierFrameLayout::offsetOfDescriptor()), scratch3);
         masm.movePtr(scratch3, scratch1);
         masm.and32(Imm32((1 << FRAMETYPE_BITS) - 1), scratch3);
@@ -1195,7 +1204,7 @@ JitRuntime::generateProfilerExitFrameTailStub(JSContext* cx)
         masm.storePtr(scratch3, lastProfilingCallSite);
 
         // scratch3 := RectFrame + Rect-Descriptor.Size + RectifierFrameLayout::Size()
-        masm.lea(Operand(scratch2, scratch1, TimesOne, RectifierFrameLayout::Size()), scratch3);
+        masm.lea(Operand(&masm, scratch2, scratch1, TimesOne, RectifierFrameLayout::Size()), scratch3);
         masm.storePtr(scratch3, lastProfilingFrame);
         masm.ret();
 
@@ -1241,7 +1250,7 @@ JitRuntime::generateProfilerExitFrameTailStub(JSContext* cx)
     masm.bind(&handle_IonAccessorIC);
     {
         // scratch2 := StackPointer + Descriptor.size + JitFrameLayout::Size()
-        masm.lea(Operand(StackPointer, scratch1, TimesOne, JitFrameLayout::Size()), scratch2);
+        masm.lea(Operand(&masm, StackPointer, scratch1, TimesOne, JitFrameLayout::Size()), scratch2);
 
         // scratch3 := AccFrame-Descriptor.Size
         masm.loadPtr(Address(scratch2, IonAccessorICFrameLayout::offsetOfDescriptor()), scratch3);
@@ -1264,7 +1273,7 @@ JitRuntime::generateProfilerExitFrameTailStub(JSContext* cx)
 
         // lastProfilingFrame := AccessorFrame + AccFrame-Descriptor.Size +
         //                       IonAccessorICFrameLayout::Size()
-        masm.lea(Operand(scratch2, scratch3, TimesOne, IonAccessorICFrameLayout::Size()), scratch1);
+        masm.lea(Operand(&masm, scratch2, scratch3, TimesOne, IonAccessorICFrameLayout::Size()), scratch1);
         masm.storePtr(scratch1, lastProfilingFrame);
         masm.ret();
     }

@@ -58,7 +58,7 @@ struct AnyRegister {
         return code_ != other.code_;
     }
     const char* name() const {
-        return isFloat() ? fpu().name() : gpr().name();
+        return isFloat() ? fpu().name(nullptr) : gpr().name(nullptr);
     }
     Code code() const {
         return code_;

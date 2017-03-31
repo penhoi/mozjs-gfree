@@ -226,10 +226,10 @@ Operand
 CodeGeneratorShared::ToOperand(const LAllocation& a)
 {
     if (a.isGeneralReg())
-        return Operand(a.toGeneralReg()->reg());
+        return Operand(&masm, a.toGeneralReg()->reg());
     if (a.isFloatReg())
-        return Operand(a.toFloatReg()->reg());
-    return Operand(masm.getStackPointer(), ToStackOffset(&a));
+        return Operand(&masm, a.toFloatReg()->reg());
+    return Operand(&masm, masm.getStackPointer(), ToStackOffset(&a));
 }
 
 Operand
@@ -309,7 +309,7 @@ CodeGeneratorShared::verifyHeapAccessDisassembly(uint32_t begin, uint32_t end, b
       case Scalar::Int32:
       case Scalar::Uint32:
         if (!alloc.isConstant()) {
-            op = OtherOperand(ToRegister(alloc).encoding());
+            op = OtherOperand(ToRegister(alloc).encoding(&masm));
         } else {
             int32_t i = ToInt32(&alloc);
 
@@ -326,7 +326,7 @@ CodeGeneratorShared::verifyHeapAccessDisassembly(uint32_t begin, uint32_t end, b
       case Scalar::Float64:
       case Scalar::Float32x4:
       case Scalar::Int32x4:
-        op = OtherOperand(ToFloatRegister(alloc).encoding());
+        op = OtherOperand(ToFloatRegister(alloc).encoding(&masm));
         break;
       case Scalar::Uint8Clamped:
       case Scalar::MaxTypedArrayViewType:

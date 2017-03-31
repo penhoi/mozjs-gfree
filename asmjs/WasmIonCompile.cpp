@@ -639,6 +639,7 @@ class FunctionCompiler
         Call(FunctionCompiler& f, uint32_t lineno, uint32_t column)
           : lineno_(lineno),
             column_(column),
+            abi_(nullptr),
             prevMaxStackBytes_(0),
             maxChildStackBytes_(0),
             spIncrement_(0),

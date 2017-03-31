@@ -37,13 +37,13 @@ MacroAssembler::and32(Imm32 imm, Register dest)
 void
 MacroAssembler::and32(Imm32 imm, const Address& dest)
 {
-    andl(imm, Operand(dest));
+    andl(imm, Operand(this, dest));
 }
 
 void
 MacroAssembler::and32(const Address& src, Register dest)
 {
-    andl(Operand(src), dest);
+    andl(Operand(this, src), dest);
 }
 
 void
@@ -61,7 +61,7 @@ MacroAssembler::or32(Imm32 imm, Register dest)
 void
 MacroAssembler::or32(Imm32 imm, const Address& dest)
 {
-    orl(imm, Operand(dest));
+    orl(imm, Operand(this, dest));
 }
 
 void
@@ -94,7 +94,7 @@ MacroAssembler::sub32(Imm32 imm, Register dest)
 void
 MacroAssembler::sub32(const Address& src, Register dest)
 {
-    subl(Operand(src), dest);
+    subl(Operand(this, src), dest);
 }
 
 //}}} check_macroassembler_style

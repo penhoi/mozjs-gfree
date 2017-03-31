@@ -503,7 +503,7 @@ MacroAssembler::call(Label* label)
 void
 MacroAssembler::call(const Address& addr)
 {
-    Assembler::call(Operand(addr.base, addr.offset));
+    Assembler::call(Operand(this, addr.base, addr.offset));
 }
 
 void

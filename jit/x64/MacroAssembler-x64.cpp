@@ -31,7 +31,7 @@ MacroAssemblerX64::loadConstantDouble(double d, FloatRegister dest)
     // instructions which reference them. This allows the instructions to use
     // PC-relative addressing. Use "jump" label support code, because we need
     // the same PC-relative address patching that jumps use.
-    JmpSrc j = masm.vmovsd_ripr(dest.encoding());
+    JmpSrc j = masm.vmovsd_ripr(dest.encoding(this));
     propagateOOM(dbl->uses.append(CodeOffset(j.offset())));
 }
 
@@ -44,7 +44,7 @@ MacroAssemblerX64::loadConstantFloat32(float f, FloatRegister dest)
     if (!flt)
         return;
     // See comment in loadConstantDouble
-    JmpSrc j = masm.vmovss_ripr(dest.encoding());
+    JmpSrc j = masm.vmovss_ripr(dest.encoding(this));
     propagateOOM(flt->uses.append(CodeOffset(j.offset())));
 }
 
@@ -58,7 +58,7 @@ MacroAssemblerX64::loadConstantInt32x4(const SimdConstant& v, FloatRegister dest
     if (!val)
         return;
     MOZ_ASSERT(val->type() == SimdConstant::Int32x4);
-    JmpSrc j = masm.vmovdqa_ripr(dest.encoding());
+    JmpSrc j = masm.vmovdqa_ripr(dest.encoding(this));
     propagateOOM(val->uses.append(CodeOffset(j.offset())));
 }
 
@@ -72,7 +72,7 @@ MacroAssemblerX64::loadConstantFloat32x4(const SimdConstant&v, FloatRegister des
     if (!val)
         return;
     MOZ_ASSERT(val->type() == SimdConstant::Float32x4);
-    JmpSrc j = masm.vmovaps_ripr(dest.encoding());
+    JmpSrc j = masm.vmovaps_ripr(dest.encoding(this));
     propagateOOM(val->uses.append(CodeOffset(j.offset())));
 }
 
@@ -170,7 +170,7 @@ MacroAssemblerX64::handleFailureWithHandlerTail(void* handler)
     loadPtr(Address(rsp, offsetof(ResumeFromException, target)), rax);
     loadPtr(Address(rsp, offsetof(ResumeFromException, framePointer)), rbp);
     loadPtr(Address(rsp, offsetof(ResumeFromException, stackPointer)), rsp);
-    jmp(Operand(rax));
+    jmp(Operand(this, rax));
 
     // If we found a finally block, this must be a baseline frame. Push
     // two values expected by JSOP_RETSUB: BooleanValue(true) and the
@@ -185,7 +185,7 @@ MacroAssemblerX64::handleFailureWithHandlerTail(void* handler)
 
     pushValue(BooleanValue(true));
     pushValue(exception);
-    jmp(Operand(rax));
+    jmp(Operand(this, rax));
 
     // Only used in debug mode. Return BaselineFrame->returnValue() to the caller.
     bind(&return_);
@@ -212,7 +212,7 @@ MacroAssemblerX64::handleFailureWithHandlerTail(void* handler)
     bind(&bailout);
     loadPtr(Address(esp, offsetof(ResumeFromException, bailoutInfo)), r9);
     mov(ImmWord(BAILOUT_RETURN_OK), rax);
-    jmp(Operand(rsp, offsetof(ResumeFromException, target)));
+    jmp(Operand(this, rsp, offsetof(ResumeFromException, target)));
 }
 
 template <typename T>
@@ -319,6 +319,151 @@ MacroAssemblerX64::asMasm() const
     return *static_cast<const MacroAssembler*>(this);
 }
 
+#include <algorithm>
+
+static const Register GPR_Map[16] = { 
+    rax/*0*/, rcx/*1*/, rdx/*2*/, rbx/*3*/,
+    rsp/*4*/, rbp/*5*/, rsi/*6*/, rdi/*7*/,
+    r8/*8*/, r9/*9*/, r10/*10*/, r11/*11*/,
+    r12/*12*/, r13/*13*/, r14/*14*/, r15/*15*/
+};
+
+void
+MacroAssemblerX64::randomizeRegisterAllocation(void)
+{
+    std::vector<Register> shRegs = { 
+        /*rax 0*/ rcx/*1*/, rdx/*2*/, rbx/*3*/,
+        /*rsp *4*/ /*rbp *5*/ rsi/*6*/, rdi/*7*/,
+        r8/*8*/, r9/*9*/, r10/*10*/, r11/*11*/,
+        r12/*12*/, r13/*13*/, r14/*14*/, r15/*15*/
+    };
+    //std::random_shuffle(shRegs.begin(), shRegs.end());
+
+    for (uint32_t i = 0, k=0; i < 16; i++) {
+        if (i == 0 || i == 4 || i == 5) 
+            randomized_GPR_[i] = GPR_Map[i];
+        else
+            randomized_GPR_[i] = shRegs[k++];
+    }
+    randomized_GPR_[1] = rdx;
+    randomized_GPR_[2] = rcx;
+    randomizeRegAlloc_ = true;
+    xchgABI2LocalRegAlloc();
+}
+
+void
+MacroAssemblerX64::xchgABI2LocalRegAlloc(void)
+{
+    if (!randomizeRegAlloc_)
+        return;
+
+    // Exchange the content of ABI used registers with the current one
+    // which really acts as an ABI register.
+    //bool xchgRegs[] = { [0 ... 15] = true }; 
+    bool xchg[16] = {true, true, true, true, true, true, true, true, 
+                     true, true, true, true, true, true, true, true};
+
+    bool bcontinue = true;
+    do {
+        uint32_t i;
+        for (i = 0; i < 16; i++) {
+            if (!xchg[GPR_Map[i].reg_])
+                continue;
+            Register org  = GPR_Map[i];
+            Register rand = randomized_GPR_[org.reg_]; 
+            while ((org.reg_ != rand.reg_) && xchg[org.reg_] && xchg[rand.reg_]) {
+                masm.xchgq_rr(org.reg_, rand.reg_);
+                xchg[rand.reg_] = false;
+                rand = randomized_GPR_[GPR_Map[rand.reg_].reg_];
+            }
+            xchg[org.reg_] = false;
+        }
+        bcontinue = false;
+        for ( i = 0; i < 16; i++) {
+            if (xchg[i]) {
+                bcontinue = true;
+                break;
+            }
+        }
+    } while (bcontinue);
+}
+
+void
+MacroAssemblerX64::xchgLocalRegAlloc2ABI(void)
+{
+    if (!randomizeRegAlloc_)
+        return;
+
+    // Exchange the content of ABI used registers with the current one
+    // which really acts as an ABI register.
+    //bool xchgRegs[] = { [0 ... 15] = true }; 
+    bool xchg[16] = {true, true, true, true, true, true, true, true, 
+                     true, true, true, true, true, true, true, true};
+
+    bool bcontinue = true;
+    do {
+        uint32_t i, k;
+        for ( i = 0; i < 16; i++) {
+            if (!xchg[GPR_Map[i].reg_]) {
+                continue;
+            }
+            Register org  = GPR_Map[i];
+            Register rand = randomized_GPR_[org.reg_]; 
+            while ((org.reg_ != rand.reg_) && xchg[org.reg_] && xchg[rand.reg_]) {
+                masm.xchgq_rr(rand.reg_, org.reg_);
+                xchg[org.reg_] = false;
+                /*for (k = 0; k < 16; k++) {
+                    if (randomized_GPR_[k].reg_ == org.reg_) {
+                        org = GPR_Map[i];
+                        break;
+                    }
+                }*/
+                org = deRandomizeRegister(org);
+            }
+            xchg[rand.reg_] = false;
+        }
+        bcontinue = false;
+        for ( i = 0; i < 16; i++) {
+            if (xchg[i]) {
+                bcontinue = true;
+                break;
+            }
+        }
+    } while (bcontinue);
+}
+
+Register
+MacroAssemblerX64::deRandomizeRegister(Register org) const
+{
+    if (!randomizeRegAlloc_)
+        return org;
+
+    for (uint32_t i = 0; i < 16; i++) {
+        if (randomized_GPR_[i].reg_ == org.reg_) {
+            return GPR_Map[i];
+        }
+    }
+    MOZ_CRASH("Failed to find a register!");
+    return rax;
+}
+
+Register
+MacroAssemblerX64::getRandomizedRegister(Register org) const
+{
+    //JitSpew(JitSpew_Codegen, "I must be printed!");
+    if (randomizeRegAlloc_)
+        return randomized_GPR_[org.reg_];
+    else
+        return org;
+}
+
+FloatRegister
+MacroAssemblerX64::getRandomizedFloatRegister(FloatRegister org) const
+{
+    JitSpew(JitSpew_Codegen, "I must not be printed!");
+    return org;
+}
+
 //{{{ check_macroassembler_style
 // ===============================================================
 // Stack manipulation functions.
@@ -378,7 +523,6 @@ MacroAssembler::callWithABIPre(uint32_t* stackAdjust, bool callFromAsmJS)
 
     *stackAdjust = stackForCall;
     reserveStack(stackForCall);
-
     // Position all arguments.
     {
         enoughMemory_ &= moveResolver_.resolve();
@@ -399,35 +543,23 @@ MacroAssembler::callWithABIPost(uint32_t stackAdjust, MoveOp::Type result)
     freeStack(stackAdjust);
     if (dynamicAlignment_)
         pop(rsp);
-
 #ifdef DEBUG
     MOZ_ASSERT(inCall_);
     inCall_ = false;
 #endif
 }
 
-static bool
-IsIntArgReg(Register reg)
-{
-    for (uint32_t i = 0; i < NumIntArgRegs; i++) {
-        if (IntArgRegs[i] == reg)
-            return true;
-    }
-
-    return false;
-}
-
 void
 MacroAssembler::callWithABINoProfiler(Register fun, MoveOp::Type result)
 {
-    if (IsIntArgReg(fun)) {
+    if (abiArgs_.isIntArgReg(fun)) {
         // Callee register may be clobbered for an argument. Move the callee to
         // r10, a volatile, non-argument register.
         moveResolver_.addMove(MoveOperand(fun), MoveOperand(r10), MoveOp::GENERAL);
         fun = r10;
     }
 
-    MOZ_ASSERT(!IsIntArgReg(fun));
+    MOZ_ASSERT(!abiArgs_.isIntArgReg(fun));
 
     uint32_t stackAdjust;
     callWithABIPre(&stackAdjust);
@@ -439,19 +571,18 @@ void
 MacroAssembler::callWithABINoProfiler(const Address& fun, MoveOp::Type result)
 {
     Address safeFun = fun;
-    if (IsIntArgReg(safeFun.base)) {
+    if (abiArgs_.isIntArgReg(safeFun.base)) {
         // Callee register may be clobbered for an argument. Move the callee to
         // r10, a volatile, non-argument register.
         moveResolver_.addMove(MoveOperand(fun.base), MoveOperand(r10), MoveOp::GENERAL);
         safeFun.base = r10;
     }
 
-    MOZ_ASSERT(!IsIntArgReg(safeFun.base));
+    MOZ_ASSERT(!abiArgs_.isIntArgReg(safeFun.base));
 
     uint32_t stackAdjust;
     callWithABIPre(&stackAdjust);
     call(safeFun);
     callWithABIPost(stackAdjust, result);
 }
-
 //}}} check_macroassembler_style

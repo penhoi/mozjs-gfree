@@ -5,13 +5,14 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "jit/x64/Assembler-x64.h"
+#include "jit/MacroAssembler.h"
 
 #include "gc/Marking.h"
 
 using namespace js;
 using namespace js::jit;
 
-ABIArgGenerator::ABIArgGenerator()
+ABIArgGenerator::ABIArgGenerator(Assembler *asmer)
   :
 #if defined(XP_WIN)
     regIndex_(0),
@@ -22,13 +23,34 @@ ABIArgGenerator::ABIArgGenerator()
     stackOffset_(0),
 #endif
     current_()
-{}
+{
+    if (asmer) {
+        MacroAssembler *masm = static_cast<MacroAssembler*>(asmer);
+        for (uint32_t i = 0; i < NumIntArgRegs; i++) {
+            randomizedIntArgRegs_[i] = masm->deRandomizeRegister(IntArgRegs[i]);
+        }
+    }    
+    else {
+        for (uint32_t i = 0; i < NumIntArgRegs; i++) {
+            randomizedIntArgRegs_[i] = IntArgRegs[i];
+        }
+    }
+}
+
+bool 
+ABIArgGenerator::isIntArgReg(Register reg)
+{
+    for (uint32_t i = 0; i < NumIntArgRegs; i++) {
+        if (randomizedIntArgRegs_[i] == reg)
+            return true;
+    }
+    return false;
+}
 
 ABIArg
 ABIArgGenerator::next(MIRType type)
 {
 #if defined(XP_WIN)
-    JS_STATIC_ASSERT(NumIntArgRegs == NumFloatArgRegs);
     if (regIndex_ == NumIntArgRegs) {
         if (IsSimdType(type)) {
             // On Win64, >64 bit args need to be passed by reference, but asm.js
@@ -46,7 +68,7 @@ ABIArgGenerator::next(MIRType type)
     switch (type) {
       case MIRType_Int32:
       case MIRType_Pointer:
-        current_ = ABIArg(IntArgRegs[regIndex_++]);
+        current_ = ABIArg(randomizedIntArgRegs_[regIndex_++]);
         break;
       case MIRType_Float32:
         current_ = ABIArg(FloatArgRegs[regIndex_++].asSingle());
@@ -74,7 +96,7 @@ ABIArgGenerator::next(MIRType type)
             stackOffset_ += sizeof(uint64_t);
             break;
         }
-        current_ = ABIArg(IntArgRegs[intRegIndex_++]);
+        current_ = ABIArg(randomizedIntArgRegs_[intRegIndex_++]);
         break;
       case MIRType_Double:
       case MIRType_Float32:
@@ -296,3 +318,4 @@ Assembler::TraceJumpRelocations(JSTracer* trc, JitCode* code, CompactBufferReade
         MOZ_ASSERT(child == CodeFromJump(code, code->raw() + iter.offset()));
     }
 }
+

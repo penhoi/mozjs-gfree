@@ -307,8 +307,8 @@ CodeGeneratorX64::emitSimdLoad(LAsmJSLoadHeap* ins)
     FloatRegister out = ToFloatRegister(ins->output());
     const LAllocation* ptr = ins->ptr();
     Operand srcAddr = ptr->isBogus()
-                      ? Operand(HeapReg, mir->offset())
-                      : Operand(HeapReg, ToRegister(ptr), TimesOne, mir->offset());
+                      ? Operand(&masm, HeapReg, mir->offset())
+                      : Operand(&masm, HeapReg, ToRegister(ptr), TimesOne, mir->offset());
 
     uint32_t maybeCmpOffset = wasm::HeapAccess::NoLengthCheck;
     if (gen->needsAsmJSBoundsCheckBranch(mir))
@@ -321,8 +321,8 @@ CodeGeneratorX64::emitSimdLoad(LAsmJSLoadHeap* ins)
 
         Operand srcAddrZ =
             ptr->isBogus()
-            ? Operand(HeapReg, 2 * sizeof(float) + mir->offset())
-            : Operand(HeapReg, ToRegister(ptr), TimesOne, 2 * sizeof(float) + mir->offset());
+            ? Operand(&masm, HeapReg, 2 * sizeof(float) + mir->offset())
+            : Operand(&masm, HeapReg, ToRegister(ptr), TimesOne, 2 * sizeof(float) + mir->offset());
 
         // Load XY
         uint32_t before = masm.size();
@@ -369,8 +369,8 @@ CodeGeneratorX64::visitAsmJSLoadHeap(LAsmJSLoadHeap* ins)
     const LAllocation* ptr = ins->ptr();
     const LDefinition* out = ins->output();
     Operand srcAddr = ptr->isBogus()
-                      ? Operand(HeapReg, mir->offset())
-                      : Operand(HeapReg, ToRegister(ptr), TimesOne, mir->offset());
+                      ? Operand(&masm, HeapReg, mir->offset())
+                      : Operand(&masm, HeapReg, ToRegister(ptr), TimesOne, mir->offset());
 
     memoryBarrier(mir->barrierBefore());
     OutOfLineLoadTypedArrayOutOfBounds* ool = nullptr;
@@ -462,8 +462,8 @@ CodeGeneratorX64::emitSimdStore(LAsmJSStoreHeap* ins)
     FloatRegister in = ToFloatRegister(ins->value());
     const LAllocation* ptr = ins->ptr();
     Operand dstAddr = ptr->isBogus()
-                      ? Operand(HeapReg, mir->offset())
-                      : Operand(HeapReg, ToRegister(ptr), TimesOne, mir->offset());
+                      ? Operand(&masm, HeapReg, mir->offset())
+                      : Operand(&masm, HeapReg, ToRegister(ptr), TimesOne, mir->offset());
 
     uint32_t maybeCmpOffset = wasm::HeapAccess::NoLengthCheck;
     if (gen->needsAsmJSBoundsCheckBranch(mir))
@@ -476,8 +476,8 @@ CodeGeneratorX64::emitSimdStore(LAsmJSStoreHeap* ins)
 
         Operand dstAddrZ =
             ptr->isBogus()
-            ? Operand(HeapReg, 2 * sizeof(float) + mir->offset())
-            : Operand(HeapReg, ToRegister(ptr), TimesOne, 2 * sizeof(float) + mir->offset());
+            ? Operand(&masm, HeapReg, 2 * sizeof(float) + mir->offset())
+            : Operand(&masm, HeapReg, ToRegister(ptr), TimesOne, 2 * sizeof(float) + mir->offset());
 
         // It's possible that the Z could be out of bounds when the XY is in
         // bounds. To avoid storing the XY before the exception is thrown, we
@@ -522,8 +522,8 @@ CodeGeneratorX64::visitAsmJSStoreHeap(LAsmJSStoreHeap* ins)
     const LAllocation* value = ins->value();
     const LAllocation* ptr = ins->ptr();
     Operand dstAddr = ptr->isBogus()
-                      ? Operand(HeapReg, mir->offset())
-                      : Operand(HeapReg, ToRegister(ptr), TimesOne, mir->offset());
+                      ? Operand(&masm, HeapReg, mir->offset())
+                      : Operand(&masm, HeapReg, ToRegister(ptr), TimesOne, mir->offset());
 
     memoryBarrier(mir->barrierBefore());
     Label* rejoin = nullptr;
@@ -807,7 +807,7 @@ CodeGeneratorX64::visitAsmJSLoadFuncPtr(LAsmJSLoadFuncPtr* ins)
     Register out = ToRegister(ins->output());
 
     CodeOffset label = masm.leaRipRelative(tmp);
-    masm.loadPtr(Operand(tmp, index, TimesEight, 0), out);
+    masm.loadPtr(Operand(&masm, tmp, index, TimesEight, 0), out);
     masm.append(AsmJSGlobalAccess(label, mir->globalDataOffset()));
 }
 

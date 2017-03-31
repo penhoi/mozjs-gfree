@@ -2213,6 +2213,7 @@ MacroAssembler::alignJitStackBasedOnNArgs(uint32_t nargs)
 MacroAssembler::MacroAssembler(JSContext* cx, IonScript* ion,
                                JSScript* script, jsbytecode* pc)
   : framePushed_(0),
+    abiArgs_(nullptr),
 #ifdef DEBUG
     inCall_(false),
 #endif
@@ -2234,6 +2235,20 @@ MacroAssembler::MacroAssembler(JSContext* cx, IonScript* ion,
         if (pc && cx->runtime()->spsProfiler.enabled())
             enableProfilingInstrumentation();
     }
+}
+
+void
+MacroAssembler::ret(void)
+{
+    xchgLocalRegAlloc2ABI();
+    MacroAssemblerSpecific::ret();
+}
+
+void
+MacroAssembler::retn(Imm32 n)
+{
+    xchgLocalRegAlloc2ABI();
+    MacroAssemblerSpecific::retn(n);
 }
 
 MacroAssembler::AfterICSaveLive
@@ -2441,7 +2456,7 @@ MacroAssembler::setupABICall()
 #endif
 
     // Reinitialize the ABIArg generator.
-    abiArgs_ = ABIArgGenerator();
+    abiArgs_ = ABIArgGenerator(this);
 
 #if defined(JS_CODEGEN_ARM)
     // On ARM, we need to know what ABI we are using, either in the
@@ -2469,6 +2484,7 @@ MacroAssembler::setupAlignedABICall()
 {
     setupABICall();
     dynamicAlignment_ = false;
+
     assertStackAlignment(ABIStackAlignment);
 
 #if defined(JS_CODEGEN_ARM64)

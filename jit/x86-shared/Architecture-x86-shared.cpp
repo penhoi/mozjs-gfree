@@ -1,4 +1,4 @@
-/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
+/* -*- Mode: C++; tab-idth: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
  * vim: set ts=8 sts=4 et sw=4 tw=99:
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,8 +11,22 @@
 
 #include "jit/RegisterSets.h"
 
+js::jit::FloatRegister::Encoding
+js::jit::FloatRegister::encoding(AssemblerX86Shared *asmer) const
+{
+    FloatRegister r = *this;
+    /*if (asmer) {
+        MacroAssembler *masm = static_cast<MacroAssembler*>(asmer);
+        r = masm->getRandomizedFloatRegister(r);
+    }*/
+
+    MOZ_ASSERT(!isInvalid());
+    MOZ_ASSERT(uint32_t(r.reg_) < Codes::TotalPhys);
+    return (X86Encoding::XMMRegisterID) r.reg_;
+}
+
 const char*
-js::jit::FloatRegister::name() const {
+js::jit::FloatRegister::name(AssemblerX86Shared *asmer) const {
     static const char* const names[] = {
 
 #ifdef JS_CODEGEN_X64
@@ -36,8 +50,15 @@ js::jit::FloatRegister::name() const {
 #undef FLOAT_REGS_
 
     };
-    MOZ_ASSERT(size_t(code()) < mozilla::ArrayLength(names));
-    return names[size_t(code())];
+
+    FloatRegister r = *this;
+    /*if (asmer) {
+        MacroAssembler *masm = static_cast<MacroAssembler*>(asmer);
+        r = masm->getRandomizedFloatRegister(r);
+    }*/
+
+    MOZ_ASSERT(size_t(r.code()) < mozilla::ArrayLength(names));
+    return names[r.code()];
 }
 
 js::jit::FloatRegisterSet

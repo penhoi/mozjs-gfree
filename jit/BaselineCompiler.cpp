@@ -107,6 +107,8 @@ BaselineCompiler::compile()
 
     MOZ_ASSERT(!script->hasBaselineScript());
 
+    //masm.randomizeRegisterAllocation();
+
     if (!emitPrologue())
         return Method_Error;
 

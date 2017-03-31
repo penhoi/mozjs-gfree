@@ -207,12 +207,12 @@ Operand
 MoveEmitterX86::toOperand(const MoveOperand& operand) const
 {
     if (operand.isMemoryOrEffectiveAddress())
-        return Operand(toAddress(operand));
+        return Operand(&masm, toAddress(operand));
     if (operand.isGeneralReg())
-        return Operand(operand.reg());
+        return Operand(&masm, operand.reg());
 
     MOZ_ASSERT(operand.isFloatReg());
-    return Operand(operand.floatReg());
+    return Operand(&masm, operand.floatReg());
 }
 
 // This is the same as toOperand except that it computes an Operand suitable for
@@ -222,21 +222,21 @@ MoveEmitterX86::toPopOperand(const MoveOperand& operand) const
 {
     if (operand.isMemory()) {
         if (operand.base() != StackPointer)
-            return Operand(operand.base(), operand.disp());
+            return Operand(&masm, operand.base(), operand.disp());
 
         MOZ_ASSERT(operand.disp() >= 0);
 
         // Otherwise, the stack offset may need to be adjusted.
         // Note the adjustment by the stack slot here, to offset for the fact that pop
         // computes its effective address after incrementing the stack pointer.
-        return Operand(StackPointer,
+        return Operand(&masm, StackPointer,
                        operand.disp() + (masm.framePushed() - sizeof(void*) - pushedAtStart_));
     }
     if (operand.isGeneralReg())
-        return Operand(operand.reg());
+        return Operand(&masm, operand.reg());
 
     MOZ_ASSERT(operand.isFloatReg());
-    return Operand(operand.floatReg());
+    return Operand(&masm, operand.floatReg());
 }
 
 void

@@ -182,7 +182,7 @@ class MacroAssemblerX86Shared : public Assembler
         testl(rhs, lhs);
     }
     void test32(const Address& addr, Imm32 imm) {
-        testl(imm, Operand(addr));
+        testl(imm, Operand(this, addr));
     }
     void test32(const Operand lhs, Imm32 imm) {
         testl(imm, lhs);
@@ -218,7 +218,7 @@ class MacroAssemblerX86Shared : public Assembler
         addl(imm, dest);
     }
     void add32(Imm32 imm, const Address& dest) {
-        addl(imm, Operand(dest));
+        addl(imm, Operand(this, dest));
     }
     template <typename T>
     void branchAdd32(Condition cond, T src, Register dest, Label* label) {
@@ -242,7 +242,7 @@ class MacroAssemblerX86Shared : public Assembler
         CHECK_BYTEREGS(src, output);
         if (src != output)
             movl(src, output);
-        lock_xaddb(output, Operand(mem));
+        lock_xaddb(output, Operand(this, mem));
         movsbl(output, output);
     }
 
@@ -252,7 +252,7 @@ class MacroAssemblerX86Shared : public Assembler
         MOZ_ASSERT(temp == InvalidReg);
         if (src != output)
             movl(src, output);
-        lock_xaddb(output, Operand(mem));
+        lock_xaddb(output, Operand(this, mem));
         movzbl(output, output);
     }
 
@@ -261,7 +261,7 @@ class MacroAssemblerX86Shared : public Assembler
         CHECK_BYTEREG(output);
         MOZ_ASSERT(temp == InvalidReg);
         movb(src, output);
-        lock_xaddb(output, Operand(mem));
+        lock_xaddb(output, Operand(this, mem));
         movsbl(output, output);
     }
 
@@ -270,7 +270,7 @@ class MacroAssemblerX86Shared : public Assembler
         CHECK_BYTEREG(output);
         MOZ_ASSERT(temp == InvalidReg);
         movb(src, output);
-        lock_xaddb(output, Operand(mem));
+        lock_xaddb(output, Operand(this, mem));
         movzbl(output, output);
     }
 
@@ -279,7 +279,7 @@ class MacroAssemblerX86Shared : public Assembler
         MOZ_ASSERT(temp == InvalidReg);
         if (src != output)
             movl(src, output);
-        lock_xaddw(output, Operand(mem));
+        lock_xaddw(output, Operand(this, mem));
         movswl(output, output);
     }
 
@@ -288,7 +288,7 @@ class MacroAssemblerX86Shared : public Assembler
         MOZ_ASSERT(temp == InvalidReg);
         if (src != output)
             movl(src, output);
-        lock_xaddw(output, Operand(mem));
+        lock_xaddw(output, Operand(this, mem));
         movzwl(output, output);
     }
 
@@ -296,7 +296,7 @@ class MacroAssemblerX86Shared : public Assembler
     void atomicFetchAdd16SignExtend(Imm32 src, const T& mem, Register temp, Register output) {
         MOZ_ASSERT(temp == InvalidReg);
         movl(src, output);
-        lock_xaddw(output, Operand(mem));
+        lock_xaddw(output, Operand(this, mem));
         movswl(output, output);
     }
 
@@ -304,7 +304,7 @@ class MacroAssemblerX86Shared : public Assembler
     void atomicFetchAdd16ZeroExtend(Imm32 src, const T& mem, Register temp, Register output) {
         MOZ_ASSERT(temp == InvalidReg);
         movl(src, output);
-        lock_xaddw(output, Operand(mem));
+        lock_xaddw(output, Operand(this, mem));
         movzwl(output, output);
     }
 
@@ -313,14 +313,14 @@ class MacroAssemblerX86Shared : public Assembler
         MOZ_ASSERT(temp == InvalidReg);
         if (src != output)
             movl(src, output);
-        lock_xaddl(output, Operand(mem));
+        lock_xaddl(output, Operand(this, mem));
     }
 
     template <typename T>
     void atomicFetchAdd32(Imm32 src, const T& mem, Register temp, Register output) {
         MOZ_ASSERT(temp == InvalidReg);
         movl(src, output);
-        lock_xaddl(output, Operand(mem));
+        lock_xaddl(output, Operand(this, mem));
     }
 
     template <typename T>
@@ -330,7 +330,7 @@ class MacroAssemblerX86Shared : public Assembler
         if (src != output)
             movl(src, output);
         negl(output);
-        lock_xaddb(output, Operand(mem));
+        lock_xaddb(output, Operand(this, mem));
         movsbl(output, output);
     }
 
@@ -341,7 +341,7 @@ class MacroAssemblerX86Shared : public Assembler
         if (src != output)
             movl(src, output);
         negl(output);
-        lock_xaddb(output, Operand(mem));
+        lock_xaddb(output, Operand(this, mem));
         movzbl(output, output);
     }
 
@@ -350,7 +350,7 @@ class MacroAssemblerX86Shared : public Assembler
         CHECK_BYTEREG(output);
         MOZ_ASSERT(temp == InvalidReg);
         movb(Imm32(-src.value), output);
-        lock_xaddb(output, Operand(mem));
+        lock_xaddb(output, Operand(this, mem));
         movsbl(output, output);
     }
 
@@ -359,7 +359,7 @@ class MacroAssemblerX86Shared : public Assembler
         CHECK_BYTEREG(output);
         MOZ_ASSERT(temp == InvalidReg);
         movb(Imm32(-src.value), output);
-        lock_xaddb(output, Operand(mem));
+        lock_xaddb(output, Operand(this, mem));
         movzbl(output, output);
     }
 
@@ -369,7 +369,7 @@ class MacroAssemblerX86Shared : public Assembler
         if (src != output)
             movl(src, output);
         negl(output);
-        lock_xaddw(output, Operand(mem));
+        lock_xaddw(output, Operand(this, mem));
         movswl(output, output);
     }
 
@@ -379,7 +379,7 @@ class MacroAssemblerX86Shared : public Assembler
         if (src != output)
             movl(src, output);
         negl(output);
-        lock_xaddw(output, Operand(mem));
+        lock_xaddw(output, Operand(this, mem));
         movzwl(output, output);
     }
 
@@ -387,7 +387,7 @@ class MacroAssemblerX86Shared : public Assembler
     void atomicFetchSub16SignExtend(Imm32 src, const T& mem, Register temp, Register output) {
         MOZ_ASSERT(temp == InvalidReg);
         movl(Imm32(-src.value), output);
-        lock_xaddw(output, Operand(mem));
+        lock_xaddw(output, Operand(this, mem));
         movswl(output, output);
     }
 
@@ -395,7 +395,7 @@ class MacroAssemblerX86Shared : public Assembler
     void atomicFetchSub16ZeroExtend(Imm32 src, const T& mem, Register temp, Register output) {
         MOZ_ASSERT(temp == InvalidReg);
         movl(Imm32(-src.value), output);
-        lock_xaddw(output, Operand(mem));
+        lock_xaddw(output, Operand(this, mem));
         movzwl(output, output);
     }
 
@@ -405,24 +405,24 @@ class MacroAssemblerX86Shared : public Assembler
         if (src != output)
             movl(src, output);
         negl(output);
-        lock_xaddl(output, Operand(mem));
+        lock_xaddl(output, Operand(this, mem));
     }
 
     template <typename T>
     void atomicFetchSub32(Imm32 src, const T& mem, Register temp, Register output) {
         movl(Imm32(-src.value), output);
-        lock_xaddl(output, Operand(mem));
+        lock_xaddl(output, Operand(this, mem));
     }
 
     // requires output == eax
 #define ATOMIC_BITOP_BODY(LOAD, OP, LOCK_CMPXCHG) \
         MOZ_ASSERT(output == eax);                \
-        LOAD(Operand(mem), eax);                  \
+        LOAD(Operand(this, mem), eax);                  \
         Label again;                              \
         bind(&again);                             \
         movl(eax, temp);                          \
         OP(src, temp);                            \
-        LOCK_CMPXCHG(temp, Operand(mem));         \
+        LOCK_CMPXCHG(temp, Operand(this, mem));         \
         j(NonZero, &again);
 
     template <typename S, typename T>
@@ -512,63 +512,63 @@ class MacroAssemblerX86Shared : public Assembler
 
     template <typename S, typename T>
     void atomicAdd8(const S& src, const T& mem) {
-        lock_addb(src, Operand(mem));
+        lock_addb(src, Operand(this, mem));
     }
     template <typename S, typename T>
     void atomicAdd16(const S& src, const T& mem) {
-        lock_addw(src, Operand(mem));
+        lock_addw(src, Operand(this, mem));
     }
     template <typename S, typename T>
     void atomicAdd32(const S& src, const T& mem) {
-        lock_addl(src, Operand(mem));
+        lock_addl(src, Operand(this, mem));
     }
     template <typename S, typename T>
     void atomicSub8(const S& src, const T& mem) {
-        lock_subb(src, Operand(mem));
+        lock_subb(src, Operand(this, mem));
     }
     template <typename S, typename T>
     void atomicSub16(const S& src, const T& mem) {
-        lock_subw(src, Operand(mem));
+        lock_subw(src, Operand(this, mem));
     }
     template <typename S, typename T>
     void atomicSub32(const S& src, const T& mem) {
-        lock_subl(src, Operand(mem));
+        lock_subl(src, Operand(this, mem));
     }
     template <typename S, typename T>
     void atomicAnd8(const S& src, const T& mem) {
-        lock_andb(src, Operand(mem));
+        lock_andb(src, Operand(this, mem));
     }
     template <typename S, typename T>
     void atomicAnd16(const S& src, const T& mem) {
-        lock_andw(src, Operand(mem));
+        lock_andw(src, Operand(this, mem));
     }
     template <typename S, typename T>
     void atomicAnd32(const S& src, const T& mem) {
-        lock_andl(src, Operand(mem));
+        lock_andl(src, Operand(this, mem));
     }
     template <typename S, typename T>
     void atomicOr8(const S& src, const T& mem) {
-        lock_orb(src, Operand(mem));
+        lock_orb(src, Operand(this, mem));
     }
     template <typename S, typename T>
     void atomicOr16(const S& src, const T& mem) {
-        lock_orw(src, Operand(mem));
+        lock_orw(src, Operand(this, mem));
     }
     template <typename S, typename T>
     void atomicOr32(const S& src, const T& mem) {
-        lock_orl(src, Operand(mem));
+        lock_orl(src, Operand(this, mem));
     }
     template <typename S, typename T>
     void atomicXor8(const S& src, const T& mem) {
-        lock_xorb(src, Operand(mem));
+        lock_xorb(src, Operand(this, mem));
     }
     template <typename S, typename T>
     void atomicXor16(const S& src, const T& mem) {
-        lock_xorw(src, Operand(mem));
+        lock_xorw(src, Operand(this, mem));
     }
     template <typename S, typename T>
     void atomicXor32(const S& src, const T& mem) {
-        lock_xorl(src, Operand(mem));
+        lock_xorl(src, Operand(this, mem));
     }
 
     void storeLoadFence() {
@@ -576,7 +576,7 @@ class MacroAssemblerX86Shared : public Assembler
         if (HasSSE2())
             masm.mfence();
         else
-            lock_addl(Imm32(0), Operand(Address(esp, 0)));
+            lock_addl(Imm32(0), Operand(this, Address(esp, 0)));
     }
 
     void branch16(Condition cond, Register lhs, Register rhs, Label* label) {
@@ -592,19 +592,19 @@ class MacroAssemblerX86Shared : public Assembler
         j(cond, label);
     }
     void branch32(Condition cond, const Address& lhs, Register rhs, Label* label) {
-        cmp32(Operand(lhs), rhs);
+        cmp32(Operand(this, lhs), rhs);
         j(cond, label);
     }
     void branch32(Condition cond, const Address& lhs, Imm32 imm, Label* label) {
-        cmp32(Operand(lhs), imm);
+        cmp32(Operand(this, lhs), imm);
         j(cond, label);
     }
     void branch32(Condition cond, const BaseIndex& lhs, Register rhs, Label* label) {
-        cmp32(Operand(lhs), rhs);
+        cmp32(Operand(this, lhs), rhs);
         j(cond, label);
     }
     void branch32(Condition cond, const BaseIndex& lhs, Imm32 imm, Label* label) {
-        cmp32(Operand(lhs), imm);
+        cmp32(Operand(this, lhs), imm);
         j(cond, label);
     }
     void branch32(Condition cond, Register lhs, Imm32 imm, Label* label) {
@@ -631,7 +631,7 @@ class MacroAssemblerX86Shared : public Assembler
     }
     void branchTest32(Condition cond, const Address& address, Imm32 imm, Label* label) {
         MOZ_ASSERT(cond == Zero || cond == NonZero || cond == Signed || cond == NotSigned);
-        test32(Operand(address), imm);
+        test32(Operand(this, address), imm);
         j(cond, label);
     }
     void branchTest32(Condition cond, const Operand& lhs, Imm32 imm, Label* label) {
@@ -650,10 +650,10 @@ class MacroAssemblerX86Shared : public Assembler
         jmp(label);
     }
     void jump(Register reg) {
-        jmp(Operand(reg));
+        jmp(Operand(this, reg));
     }
     void jump(const Address& addr) {
-        jmp(Operand(addr));
+        jmp(Operand(this, addr));
     }
 
     void convertInt32ToDouble(Register src, FloatRegister dest) {
@@ -667,15 +667,15 @@ class MacroAssemblerX86Shared : public Assembler
         vcvtsi2sd(src, dest, dest);
     }
     void convertInt32ToDouble(const Address& src, FloatRegister dest) {
-        convertInt32ToDouble(Operand(src), dest);
+        convertInt32ToDouble(Operand(this, src), dest);
     }
     void convertInt32ToDouble(const BaseIndex& src, FloatRegister dest) {
-        convertInt32ToDouble(Operand(src), dest);
+        convertInt32ToDouble(Operand(this, src), dest);
     }
     void convertInt32ToDouble(const Operand& src, FloatRegister dest) {
         // Clear the output register first to break dependencies; see above;
         zeroDouble(dest);
-        vcvtsi2sd(Operand(src), dest, dest);
+        vcvtsi2sd(Operand(this, src), dest, dest);
     }
     void convertInt32ToFloat32(Register src, FloatRegister dest) {
         // Clear the output register first to break dependencies; see above;
@@ -683,7 +683,7 @@ class MacroAssemblerX86Shared : public Assembler
         vcvtsi2ss(src, dest, dest);
     }
     void convertInt32ToFloat32(const Address& src, FloatRegister dest) {
-        convertInt32ToFloat32(Operand(src), dest);
+        convertInt32ToFloat32(Operand(this, src), dest);
     }
     void convertInt32ToFloat32(const Operand& src, FloatRegister dest) {
         // Clear the output register first to break dependencies; see above;
@@ -725,7 +725,7 @@ class MacroAssemblerX86Shared : public Assembler
                 MOZ_ASSERT(address.base != StackPointer);
                 do {
                     substitute_ = singleByteRegs.takeAny();
-                } while (Operand(address).containsReg(substitute_));
+                } while (Operand(masm, address).containsReg(substitute_));
 
                 masm->push(substitute_);
                 masm->mov(reg, substitute_);
@@ -743,25 +743,25 @@ class MacroAssemblerX86Shared : public Assembler
     };
 
     void load8ZeroExtend(const Address& src, Register dest) {
-        movzbl(Operand(src), dest);
+        movzbl(Operand(this, src), dest);
     }
     void load8ZeroExtend(const BaseIndex& src, Register dest) {
-        movzbl(Operand(src), dest);
+        movzbl(Operand(this, src), dest);
     }
     void load8SignExtend(const Address& src, Register dest) {
-        movsbl(Operand(src), dest);
+        movsbl(Operand(this, src), dest);
     }
     void load8SignExtend(const BaseIndex& src, Register dest) {
-        movsbl(Operand(src), dest);
+        movsbl(Operand(this, src), dest);
     }
     template <typename T>
     void store8(Imm32 src, const T& dest) {
-        movb(src, Operand(dest));
+        movb(src, Operand(this, dest));
     }
     template <typename T>
     void store8(Register src, const T& dest) {
         AutoEnsureByteRegister ensure(this, dest, src);
-        movb(ensure.reg(), Operand(dest));
+        movb(ensure.reg(), Operand(this, dest));
     }
     template <typename T>
     void compareExchange8ZeroExtend(const T& mem, Register oldval, Register newval, Register output) {
@@ -769,7 +769,7 @@ class MacroAssemblerX86Shared : public Assembler
         CHECK_BYTEREG(newval);
         if (oldval != output)
             movl(oldval, output);
-        lock_cmpxchgb(newval, Operand(mem));
+        lock_cmpxchgb(newval, Operand(this, mem));
         movzbl(output, output);
     }
     template <typename T>
@@ -778,39 +778,39 @@ class MacroAssemblerX86Shared : public Assembler
         CHECK_BYTEREG(newval);
         if (oldval != output)
             movl(oldval, output);
-        lock_cmpxchgb(newval, Operand(mem));
+        lock_cmpxchgb(newval, Operand(this, mem));
         movsbl(output, output);
     }
     template <typename T>
     void atomicExchange8ZeroExtend(const T& mem, Register value, Register output) {
         if (value != output)
             movl(value, output);
-        xchgb(output, Operand(mem));
+        xchgb(output, Operand(this, mem));
         movzbl(output, output);
     }
     template <typename T>
     void atomicExchange8SignExtend(const T& mem, Register value, Register output) {
         if (value != output)
             movl(value, output);
-        xchgb(output, Operand(mem));
+        xchgb(output, Operand(this, mem));
         movsbl(output, output);
     }
     void load16ZeroExtend(const Address& src, Register dest) {
-        movzwl(Operand(src), dest);
+        movzwl(Operand(this, src), dest);
     }
     void load16ZeroExtend(const BaseIndex& src, Register dest) {
-        movzwl(Operand(src), dest);
+        movzwl(Operand(this, src), dest);
     }
     template <typename S, typename T>
     void store16(const S& src, const T& dest) {
-        movw(src, Operand(dest));
+        movw(src, Operand(this, dest));
     }
     template <typename T>
     void compareExchange16ZeroExtend(const T& mem, Register oldval, Register newval, Register output) {
         MOZ_ASSERT(output == eax);
         if (oldval != output)
             movl(oldval, output);
-        lock_cmpxchgw(newval, Operand(mem));
+        lock_cmpxchgw(newval, Operand(this, mem));
         movzwl(output, output);
     }
     template <typename T>
@@ -818,54 +818,54 @@ class MacroAssemblerX86Shared : public Assembler
         MOZ_ASSERT(output == eax);
         if (oldval != output)
             movl(oldval, output);
-        lock_cmpxchgw(newval, Operand(mem));
+        lock_cmpxchgw(newval, Operand(this, mem));
         movswl(output, output);
     }
     template <typename T>
     void atomicExchange16ZeroExtend(const T& mem, Register value, Register output) {
         if (value != output)
             movl(value, output);
-        xchgw(output, Operand(mem));
+        xchgw(output, Operand(this, mem));
         movzwl(output, output);
     }
     template <typename T>
     void atomicExchange16SignExtend(const T& mem, Register value, Register output) {
         if (value != output)
             movl(value, output);
-        xchgw(output, Operand(mem));
+        xchgw(output, Operand(this, mem));
         movswl(output, output);
     }
     void load16SignExtend(const Address& src, Register dest) {
-        movswl(Operand(src), dest);
+        movswl(Operand(this, src), dest);
     }
     void load16SignExtend(const BaseIndex& src, Register dest) {
-        movswl(Operand(src), dest);
+        movswl(Operand(this, src), dest);
     }
     void load32(const Address& address, Register dest) {
-        movl(Operand(address), dest);
+        movl(Operand(this, address), dest);
     }
     void load32(const BaseIndex& src, Register dest) {
-        movl(Operand(src), dest);
+        movl(Operand(this, src), dest);
     }
     void load32(const Operand& src, Register dest) {
         movl(src, dest);
     }
     template <typename S, typename T>
     void store32(const S& src, const T& dest) {
-        movl(src, Operand(dest));
+        movl(src, Operand(this, dest));
     }
     template <typename T>
     void compareExchange32(const T& mem, Register oldval, Register newval, Register output) {
         MOZ_ASSERT(output == eax);
         if (oldval != output)
             movl(oldval, output);
-        lock_cmpxchgl(newval, Operand(mem));
+        lock_cmpxchgl(newval, Operand(this, mem));
     }
     template <typename T>
     void atomicExchange32(const T& mem, Register value, Register output) {
         if (value != output)
             movl(value, output);
-        xchgl(output, Operand(mem));
+        xchgl(output, Operand(this, mem));
     }
     template <typename S, typename T>
     void store32_NoSecondScratch(const S& src, const T& dest) {
@@ -994,24 +994,24 @@ class MacroAssemblerX86Shared : public Assembler
     template <class T> inline void storeAlignedVector(FloatRegister src, const Address& dest);
 
     void loadInt32x1(const Address& src, FloatRegister dest) {
-        vmovd(Operand(src), dest);
+        vmovd(Operand(this, src), dest);
     }
     void loadInt32x1(const BaseIndex& src, FloatRegister dest) {
-        vmovd(Operand(src), dest);
+        vmovd(Operand(this, src), dest);
     }
     void loadInt32x2(const Address& src, FloatRegister dest) {
-        vmovq(Operand(src), dest);
+        vmovq(Operand(this, src), dest);
     }
     void loadInt32x2(const BaseIndex& src, FloatRegister dest) {
-        vmovq(Operand(src), dest);
+        vmovq(Operand(this, src), dest);
     }
     void loadInt32x3(const BaseIndex& src, FloatRegister dest) {
         BaseIndex srcZ(src);
         srcZ.offset += 2 * sizeof(int32_t);
 
         ScratchSimd128Scope scratch(asMasm());
-        vmovq(Operand(src), dest);
-        vmovd(Operand(srcZ), scratch);
+        vmovq(Operand(this, src), dest);
+        vmovd(Operand(this, srcZ), scratch);
         vmovlhps(scratch, dest, dest);
     }
     void loadInt32x3(const Address& src, FloatRegister dest) {
@@ -1019,19 +1019,19 @@ class MacroAssemblerX86Shared : public Assembler
         srcZ.offset += 2 * sizeof(int32_t);
 
         ScratchSimd128Scope scratch(asMasm());
-        vmovq(Operand(src), dest);
-        vmovd(Operand(srcZ), scratch);
+        vmovq(Operand(this, src), dest);
+        vmovd(Operand(this, srcZ), scratch);
         vmovlhps(scratch, dest, dest);
     }
 
     void loadAlignedInt32x4(const Address& src, FloatRegister dest) {
-        vmovdqa(Operand(src), dest);
+        vmovdqa(Operand(this, src), dest);
     }
     void loadAlignedInt32x4(const Operand& src, FloatRegister dest) {
         vmovdqa(src, dest);
     }
     void storeAlignedInt32x4(FloatRegister src, const Address& dest) {
-        vmovdqa(src, Operand(dest));
+        vmovdqa(src, Operand(this, dest));
     }
     void moveInt32x4(FloatRegister src, FloatRegister dest) {
         vmovdqa(src, dest);
@@ -1049,49 +1049,49 @@ class MacroAssemblerX86Shared : public Assembler
         return dest;
     }
     void loadUnalignedInt32x4(const Address& src, FloatRegister dest) {
-        vmovdqu(Operand(src), dest);
+        vmovdqu(Operand(this, src), dest);
     }
     void loadUnalignedInt32x4(const BaseIndex& src, FloatRegister dest) {
-        vmovdqu(Operand(src), dest);
+        vmovdqu(Operand(this, src), dest);
     }
     void loadUnalignedInt32x4(const Operand& src, FloatRegister dest) {
         vmovdqu(src, dest);
     }
 
     void storeInt32x1(FloatRegister src, const Address& dest) {
-        vmovd(src, Operand(dest));
+        vmovd(src, Operand(this, dest));
     }
     void storeInt32x1(FloatRegister src, const BaseIndex& dest) {
-        vmovd(src, Operand(dest));
+        vmovd(src, Operand(this, dest));
     }
     void storeInt32x2(FloatRegister src, const Address& dest) {
-        vmovq(src, Operand(dest));
+        vmovq(src, Operand(this, dest));
     }
     void storeInt32x2(FloatRegister src, const BaseIndex& dest) {
-        vmovq(src, Operand(dest));
+        vmovq(src, Operand(this, dest));
     }
     void storeInt32x3(FloatRegister src, const Address& dest) {
         Address destZ(dest);
         destZ.offset += 2 * sizeof(int32_t);
-        vmovq(src, Operand(dest));
+        vmovq(src, Operand(this, dest));
         ScratchSimd128Scope scratch(asMasm());
         vmovhlps(src, scratch, scratch);
-        vmovd(scratch, Operand(destZ));
+        vmovd(scratch, Operand(this, destZ));
     }
     void storeInt32x3(FloatRegister src, const BaseIndex& dest) {
         BaseIndex destZ(dest);
         destZ.offset += 2 * sizeof(int32_t);
-        vmovq(src, Operand(dest));
+        vmovq(src, Operand(this, dest));
         ScratchSimd128Scope scratch(asMasm());
         vmovhlps(src, scratch, scratch);
-        vmovd(scratch, Operand(destZ));
+        vmovd(scratch, Operand(this, destZ));
     }
 
     void storeUnalignedInt32x4(FloatRegister src, const Address& dest) {
-        vmovdqu(src, Operand(dest));
+        vmovdqu(src, Operand(this, dest));
     }
     void storeUnalignedInt32x4(FloatRegister src, const BaseIndex& dest) {
-        vmovdqu(src, Operand(dest));
+        vmovdqu(src, Operand(this, dest));
     }
     void storeUnalignedInt32x4(FloatRegister src, const Operand& dest) {
         vmovdqu(src, dest);
@@ -1159,7 +1159,7 @@ class MacroAssemblerX86Shared : public Assembler
     }
 
     void loadAlignedFloat32x4(const Address& src, FloatRegister dest) {
-        vmovaps(Operand(src), dest);
+        vmovaps(Operand(this, src), dest);
     }
     void loadAlignedFloat32x4(const Operand& src, FloatRegister dest) {
         vmovaps(src, dest);
@@ -1182,7 +1182,7 @@ class MacroAssemblerX86Shared : public Assembler
         storeFloat32(scratch, destZ);
     }
     void storeAlignedFloat32x4(FloatRegister src, const Address& dest) {
-        vmovaps(src, Operand(dest));
+        vmovaps(src, Operand(this, dest));
     }
     void moveFloat32x4(FloatRegister src, FloatRegister dest) {
         vmovaps(src, dest);
@@ -1200,19 +1200,19 @@ class MacroAssemblerX86Shared : public Assembler
         return dest;
     }
     void loadUnalignedFloat32x4(const Address& src, FloatRegister dest) {
-        vmovups(Operand(src), dest);
+        vmovups(Operand(this, src), dest);
     }
     void loadUnalignedFloat32x4(const BaseIndex& src, FloatRegister dest) {
-        vmovdqu(Operand(src), dest);
+        vmovdqu(Operand(this, src), dest);
     }
     void loadUnalignedFloat32x4(const Operand& src, FloatRegister dest) {
         vmovups(src, dest);
     }
     void storeUnalignedFloat32x4(FloatRegister src, const Address& dest) {
-        vmovups(src, Operand(dest));
+        vmovups(src, Operand(this, dest));
     }
     void storeUnalignedFloat32x4(FloatRegister src, const BaseIndex& dest) {
-        vmovups(src, Operand(dest));
+        vmovups(src, Operand(this, dest));
     }
     void storeUnalignedFloat32x4(FloatRegister src, const Operand& dest) {
         vmovups(src, dest);
@@ -1480,7 +1480,7 @@ class MacroAssemblerX86Shared : public Assembler
 
     template <typename T>
     void computeEffectiveAddress(const T& address, Register dest) {
-        lea(Operand(address), dest);
+        lea(Operand(this, address), dest);
     }
 
     void checkStackAlignment() {

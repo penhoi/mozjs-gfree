@@ -54,7 +54,7 @@ EmitEnterTypeMonitorIC(MacroAssembler& masm,
     masm.loadPtr(Address(ICStubReg, (int32_t) monitorStubOffset), ICStubReg);
 
     // Jump to the stubcode.
-    masm.jmp(Operand(ICStubReg, (int32_t) ICStub::offsetOfStubCode()));
+    masm.jmp(Operand(&masm, ICStubReg, (int32_t) ICStub::offsetOfStubCode()));
 }
 
 inline void
@@ -344,7 +344,7 @@ EmitStubGuardFailure(MacroAssembler& masm)
     masm.loadPtr(Address(ICStubReg, ICStub::offsetOfNext()), ICStubReg);
 
     // Return address is already loaded, just jump to the next stubcode.
-    masm.jmp(Operand(ICStubReg, ICStub::offsetOfStubCode()));
+    masm.jmp(Operand(&masm, ICStubReg, ICStub::offsetOfStubCode()));
 }
 
 } // namespace jit

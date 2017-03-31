@@ -285,11 +285,14 @@ class FloatRegisters {
 template <typename T>
 class TypedRegisterSet;
 
+class AssemblerX86Shared;
+
 struct FloatRegister {
     typedef FloatRegisters Codes;
     typedef size_t Code;
     typedef Codes::Encoding Encoding;
     typedef Codes::SetType SetType;
+
     static uint32_t SetSize(SetType x) {
         // Count the number of non-aliased registers, for the moment.
         //
@@ -380,13 +383,11 @@ struct FloatRegister {
         // that the RegisterSets depends on this.
         return Code(reg_ | (type_ << RegSize));
     }
-    Encoding encoding() const {
-        MOZ_ASSERT(!isInvalid());
-        MOZ_ASSERT(uint32_t(reg_) < Codes::TotalPhys);
-        return reg_;
-    }
+
+    Encoding encoding(AssemblerX86Shared *asmer = nullptr) const;
     // defined in Assembler-x86-shared.cpp
-    const char* name() const;
+    const char* name(AssemblerX86Shared *asmer = nullptr) const;
+
     bool volatile_() const {
         return !!((SetType(1) << code()) & FloatRegisters::VolatileMask);
     }

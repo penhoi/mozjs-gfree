@@ -348,6 +348,7 @@ class MacroAssembler : public MacroAssemblerSpecific
   public:
     MacroAssembler()
       : framePushed_(0),
+        abiArgs_(nullptr),
 #ifdef DEBUG
         inCall_(false),
 #endif
@@ -383,6 +384,7 @@ class MacroAssembler : public MacroAssemblerSpecific
     struct AsmJSToken {};
     explicit MacroAssembler(AsmJSToken, TempAllocator *alloc)
       : framePushed_(0),
+        abiArgs_(nullptr),
 #ifdef DEBUG
         inCall_(false),
 #endif
@@ -1668,6 +1670,8 @@ class MacroAssembler : public MacroAssemblerSpecific
         bind(&ok);
 #endif
     }
+    void ret();
+    void retn(Imm32 n);
 };
 
 static inline Assembler::DoubleCondition
@@ -1763,7 +1767,7 @@ class ABIArgIter
     void settle() { if (!done()) gen_.next(ToMIRType(types_[i_])); }
 
   public:
-    explicit ABIArgIter(const VecT& types) : types_(types), i_(0) { settle(); }
+    explicit ABIArgIter(const VecT& types) : gen_(nullptr), types_(types), i_(0) { settle(); }
     void operator++(int) { MOZ_ASSERT(!done()); i_++; settle(); }
     bool done() const { return i_ == types_.length(); }
 

@@ -121,10 +121,10 @@ SafepointWriter::writeGcRegs(LSafepoint* safepoint)
                                  : valueRegs.has(*iter)
                                    ? "value"
                                    : "any";
-            JitSpew(JitSpew_Safepoints, "    %s reg: %s", type, (*iter).name());
+            JitSpew(JitSpew_Safepoints, "    %s reg: %s", type, (*iter).name(nullptr));
         }
         for (FloatRegisterForwardIterator iter(spilledFloat); iter.more(); iter++)
-            JitSpew(JitSpew_Safepoints, "    float reg: %s", (*iter).name());
+            JitSpew(JitSpew_Safepoints, "    float reg: %s", (*iter).name(nullptr));
     }
 #endif
 }

@@ -425,10 +425,10 @@ LAllocation::toString() const
       case LAllocation::CONSTANT_INDEX:
         return "c";
       case LAllocation::GPR:
-        JS_snprintf(buf, sizeof(buf), "%s", toGeneralReg()->reg().name());
+        JS_snprintf(buf, sizeof(buf), "%s", toGeneralReg()->reg().name(nullptr));
         return buf;
       case LAllocation::FPU:
-        JS_snprintf(buf, sizeof(buf), "%s", toFloatReg()->reg().name());
+        JS_snprintf(buf, sizeof(buf), "%s", toFloatReg()->reg().name(nullptr));
         return buf;
       case LAllocation::STACK_SLOT:
         JS_snprintf(buf, sizeof(buf), "stack:%d", toStackSlot()->slot());

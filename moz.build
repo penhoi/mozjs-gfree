@@ -239,6 +239,7 @@ UNIFIED_SOURCES += [
     'jit/RangeAnalysis.cpp',
     'jit/Recover.cpp',
     'jit/RegisterAllocator.cpp',
+    'jit/Registers.cpp',
     'jit/RematerializedFrame.cpp',
     'jit/Safepoints.cpp',
     'jit/ScalarReplacement.cpp',
